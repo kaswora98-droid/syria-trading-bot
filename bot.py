@@ -3,8 +3,8 @@ from flask import Flask
 import telebot
 from telebot import types
 
-# ضع توكن البوت الخاص بك هنا
-TOKEN = "8928709566:AAE8G20dfLQqdo7GXJ9APGPqH70Tdyq5leg"
+# التوكن الصحيح للبوت
+TOKEN = "8928709566:AAE8G20dfLOqdo7GXJ9APGPqH7OTdyq5leg"
 bot = telebot.TeleBot(TOKEN)
 
 app = Flask(__name__)
@@ -44,7 +44,7 @@ def send_academy(message):
   bot.send_message(message.chat.id, academy_text, parse_mode="Markdown")
 
 
-# قسم الصفقات المقترحة (النسخة الثابتة والمستقرة التي تعمل فوراً)
+# قسم الصفقات المقترحة (النسخة الثابتة والمستقرة)
 @bot.message_handler(
     func=lambda message: message.text == "📊 الصفقات المقترحة والأسعار"
 )
