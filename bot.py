@@ -1,13 +1,15 @@
 import os
-from flask import Flask
+from flask import Flask, request
 import telebot
 from telebot import types
 
-# التوكن الصحيح للبوت
 TOKEN = "8928709566:AAE8G20dfLOqdo7GXJ9APGPqH7OTdyq5leg"
 bot = telebot.TeleBot(TOKEN)
 
 app = Flask(__name__)
+
+# رابط استضافتك على Render (يُرجى التأكد منه أو يكتشفه تلقائياً)
+RENDER_URL = "https://syria-trading-bot.onrender.com"
 
 
 @app.route("/")
@@ -15,7 +17,16 @@ def home():
   return "Bot is running 24/7!"
 
 
-# القائمة الرئيسية والأزرار الأربعة الاحترافية
+# استقبال التحديثات من تيليجرام عبر Webhook
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+  json_string = request.get_data().decode("utf-8")
+  update = telebot.types.Update.de_json(json_string)
+  bot.process_new_updates([update])
+  return "!", 200
+
+
+# القائمة الرئيسية والأزرار الأربعة
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
   markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
@@ -55,7 +66,7 @@ def send_trading_deals(message):
   bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
 
 
-# قسم الأكاديمية الشاملة (جميع المستويات من الصفر للاحتراف)
+# قسم الأكاديمية الشاملة
 @bot.message_handler(
     func=lambda message: message.text
     == "📚 الأكاديمية الشاملة (من الصفر للاحتراف)"
@@ -86,7 +97,7 @@ def send_academy(message):
   bot.send_message(message.chat.id, academy_text, parse_mode="Markdown")
 
 
-# قسم فتح الحسابات وإنشاء المحافظ (دليل تفصيلي كامل)
+# قسم فتح الحسابات وإنشاء المحافظ
 @bot.message_handler(
     func=lambda message: message.text
     == "🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)"
@@ -126,19 +137,10 @@ def send_payment_info(message):
   bot.send_message(message.chat.id, payment_text, parse_mode="Markdown")
 
 
-# تشغيل البوت مع سيرفر الـ Flask وإلغاء أي تضارب سابقه
 if __name__ == "__main__":
-  import threading
-
-  def run_bot():
-    try:
-      bot.remove_webhook()
-      bot.infinity_polling(timeout=60, long_polling_timeout=60)
-    except Exception as e:
-      print(f"Polling error: {e}")
-
-  t = threading.Thread(target=run_bot)
-  t.start()
+  # ضبط الـ Webhook تلقائياً عند التشغيل
+  bot.remove_webhook()
+  bot.set_webhook(url=f"{RENDER_URL}/{TOKEN}")
 
   port = int(os.environ.get("PORT", 10000))
   app.run(host="0.0.0.0", port=port)
