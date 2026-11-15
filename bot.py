@@ -1,5 +1,6 @@
 import os
 from flask import Flask, request
+import requests
 import telebot
 from telebot import types
 
@@ -7,8 +8,6 @@ TOKEN = "8928709566:AAE8G20dfLOqdo7GXJ9APGPqH7OTdyq5leg"
 bot = telebot.TeleBot(TOKEN)
 
 app = Flask(__name__)
-
-# رابط استضافتك على Render (يُرجى التأكد منه أو يكتشفه تلقائياً)
 RENDER_URL = "https://syria-trading-bot.onrender.com"
 
 
@@ -17,13 +16,28 @@ def home():
   return "Bot is running 24/7!"
 
 
-# استقبال التحديثات من تيليجرام عبر Webhook
+@app.route("/ping")
+def ping():
+  return "Pong!", 200
+
+
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
   json_string = request.get_data().decode("utf-8")
   update = telebot.types.Update.de_json(json_string)
   bot.process_new_updates([update])
   return "!", 200
+
+
+# دالة لجلب السعر الحقيقي من بينانس
+def get_binance_price(symbol):
+  try:
+    url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
+    response = requests.get(url, timeout=5)
+    data = response.json()
+    return float(data["price"])
+  except Exception:
+    return None
 
 
 # القائمة الرئيسية والأزرار الأربعة
@@ -42,26 +56,54 @@ def send_welcome(message):
   bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
 
 
-# قسم الصفقات المقترحة والأسعار
+# قسم الصفقات المقترحة والأسعار الحقيقية بمعادلة احترافية (هدف أعلى من الخسارة)
 @bot.message_handler(
     func=lambda message: message.text == "📊 الصفقات المقترحة والأسعار"
 )
 def send_trading_deals(message):
+  btc_price = get_binance_price("BTCUSDT")
+  eth_price = get_binance_price("ETHUSDT")
+  xrp_price = get_binance_price("XRPUSDT")
+
+  btc_str = f"{btc_price:,.2f}" if btc_price else "غير متوفر"
+  eth_str = f"{eth_price:,.2f}" if eth_price else "غير متوفر"
+  xrp_str = f"{xrp_price:,.4f}" if xrp_price else "غير متوفر"
+
+  # المعادلة الاحترافية الصحيحة: الهدف (+3%) ووقف الخسارة (-1.5%)
+  if btc_price:
+    btc_tp = f"{btc_price * 1.03:,.2f}"
+    btc_sl = f"{btc_price * 0.985:,.2f}"
+  else:
+    btc_tp, btc_sl = "---", "---"
+
+  if eth_price:
+    eth_tp = f"{eth_price * 1.03:,.2f}"
+    eth_sl = f"{eth_price * 0.985:,.2f}"
+  else:
+    eth_tp, eth_sl = "---", "---"
+
+  if xrp_price:
+    xrp_tp = f"{xrp_price * 1.03:,.4f}"
+    xrp_sl = f"{xrp_price * 0.985:,.4f}"
+  else:
+    xrp_tp, xrp_sl = "---", "---"
+
   deals_text = (
-      "📊 **الصفقات والأَسعار الفورية المقترحة (Binance):**\n\n"
-      "🔹 **BTC/USDT**\n"
-      "  • السعر الحالي: 64,700.72 USDT\n"
-      "  • الهدف المقترح (TP): 65,994.73 🎯\n"
-      "  • وقف الخسارة (SL): 63,730.21 🛑\n\n"
-      "🔹 **ETH/USDT**\n"
-      "  • السعر الحالي: 1,809.58 USDT\n"
-      "  • الهدف المقترح (TP): 1,845.77 🎯\n"
-      "  • وقف الخسارة (SL): 1,782.44 🛑\n\n"
-      "🔹 **XRP/USDT**\n"
-      "  • السعر الحالي: 0.96 USDT\n"
-      "  • الهدف المقترح (TP): 0.97 🎯\n"
-      "  • وقف الخسارة (SL): 0.94 🛑\n\n"
-      "⚠️ **ملاحظة:** التداول ينطوي على مخاطر، التزم بإدارة رأس المال."
+      "📊 **الأسعار الفورية والحقيقية (مباشرة من Binance):**\n\n"
+      f"🔹 **BTC/USDT**\n"
+      f"  • السعر الحالي: {btc_str} USDT\n"
+      f"  • الهدف المقترح (TP +3%): {btc_tp} 🎯\n"
+      f"  • وقف الخسارة (SL -1.5%): {btc_sl} 🛑\n\n"
+      f"🔹 **ETH/USDT**\n"
+      f"  • السعر الحالي: {eth_str} USDT\n"
+      f"  • الهدف المقترح (TP +3%): {eth_tp} 🎯\n"
+      f"  • وقف الخسارة (SL -1.5%): {eth_sl} 🛑\n\n"
+      f"🔹 **XRP/USDT**\n"
+      f"  • السعر الحالي: {xrp_str} USDT\n"
+      f"  • الهدف المقترح (TP +3%): {xrp_tp} 🎯\n"
+      f"  • وقف الخسارة (SL -1.5%): {xrp_sl} 🛑\n\n"
+      "⚠️ **ملاحظة:** الصفقات مخصصة للتداول الفوري (Spot) بدون رافعة مالية"
+      " لضمان الأمان الكامل وإدارة المخاطر."
   )
   bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
 
@@ -138,7 +180,6 @@ def send_payment_info(message):
 
 
 if __name__ == "__main__":
-  # ضبط الـ Webhook تلقائياً عند التشغيل
   bot.remove_webhook()
   bot.set_webhook(url=f"{RENDER_URL}/{TOKEN}")
 
