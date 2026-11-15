@@ -126,12 +126,16 @@ def send_payment_info(message):
   bot.send_message(message.chat.id, payment_text, parse_mode="Markdown")
 
 
-# تشغيل البوت مع سيرفر الـ Flask
+# تشغيل البوت مع سيرفر الـ Flask وإلغاء أي تضارب سابقه
 if __name__ == "__main__":
   import threading
 
   def run_bot():
-    bot.infinity_polling()
+    try:
+      bot.remove_webhook()
+      bot.infinity_polling(timeout=60, long_polling_timeout=60)
+    except Exception as e:
+      print(f"Polling error: {e}")
 
   t = threading.Thread(target=run_bot)
   t.start()
