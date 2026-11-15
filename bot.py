@@ -44,7 +44,7 @@ def send_academy(message):
   bot.send_message(message.chat.id, academy_text, parse_mode="Markdown")
 
 
-# قسم الصفقات المقترحة (النسخة الثابتة والمستقرة 100%)
+# قسم الصفقات المقترحة (النسخة الثابتة والمستقرة التي تعمل فوراً)
 @bot.message_handler(
     func=lambda message: message.text == "📊 الصفقات المقترحة والأسعار"
 )
@@ -82,13 +82,11 @@ def send_platforms(message):
 if __name__ == "__main__":
   import threading
 
-  # تشغيل البوت في خلفية مستقلة
   def run_bot():
     bot.infinity_polling()
 
   t = threading.Thread(target=run_bot)
   t.start()
 
-  # تشغيل سيرفر الويب ليتوافق مع Render وقراءة المنفذ تلقائياً
   port = int(os.environ.get("PORT", 10000))
   app.run(host="0.0.0.0", port=port)
