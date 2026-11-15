@@ -29,15 +29,41 @@ def webhook():
   return "!", 200
 
 
+# دالة محسنة لجلب السعر مع إضافة Headers لتجنب الحظر على سيرفرات الاستضافة
 def get_binance_price(symbol):
   try:
     url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-    response = requests.get(url, timeout=3)
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers, timeout=5)
     if response.status_code == 200:
       data = response.json()
       return float(data["price"])
   except Exception:
     pass
+
+  # مصدر احتياطي (Fallback) في حال واجهت Binance أي ضغط أو حظر
+  try:
+    if symbol == "BTCUSDT":
+      r = requests.get(
+          "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd",
+          timeout=5,
+      )
+      return float(r.json()["bitcoin"]["usd"])
+    elif symbol == "ETHUSDT":
+      r = requests.get(
+          "https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd",
+          timeout=5,
+      )
+      return float(r.json()["ethereum"]["usd"])
+    elif symbol == "XRPUSDT":
+      r = requests.get(
+          "https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd",
+          timeout=5,
+      )
+      return float(r.json()["ripple"]["usd"])
+  except Exception:
+    pass
+
   return None
 
 
@@ -45,7 +71,7 @@ def get_binance_price(symbol):
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
   markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-  btn1 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار الفورية (Crypto)")
+  btn1 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار (Crypto)")
   btn2 = types.KeyboardButton("🟡 صفقات الذهب (يومية وطويلة الأمد)")
   btn3 = types.KeyboardButton("📚 الأكاديمية الشاملة (من الصفر للاحتراف)")
   btn4 = types.KeyboardButton("🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)")
@@ -59,23 +85,19 @@ def send_welcome(message):
   bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
 
 
-# قسم صفقات العملات الرقمية مع التحديث اللحظي للأسعار
+# قسم صفقات العملات الرقمية والأسعار الفورية
 @bot.message_handler(
-    func=lambda message: message.text
-    == "📊 الصفقات المقترحة والأسعار الفورية (Crypto)"
+    func=lambda message: message.text == "📊 الصفقات المقترحة والأسعار (Crypto)"
 )
 def send_trading_deals(message):
-  # جلب الأسعار اللحظية من منصة Binance
   btc_price = get_binance_price("BTCUSDT")
   eth_price = get_binance_price("ETHUSDT")
   xrp_price = get_binance_price("XRPUSDT")
 
-  # تنسيق الأسعار أو إظهار تنبيه في حال انقطاع الاتصال المؤقت
-  btc_str = f"{btc_price:,.2f}" if btc_price else "جاري التحديث..."
-  eth_str = f"{eth_price:,.2f}" if eth_price else "جاري التحديث..."
-  xrp_str = f"{xrp_price:,.4f}" if xrp_price else "جاري التحديث..."
+  btc_str = f"{btc_price:,.2f}" if btc_price else "غير متوفر حالياً"
+  eth_str = f"{eth_price:,.2f}" if eth_price else "غير متوفر حالياً"
+  xrp_str = f"{xrp_price:,.4f}" if xrp_price else "غير متوفر حالياً"
 
-  # حساب الأهداف (TP +3%) وقف الخسارة (SL -1.5%) بناءً على السعر اللحظي
   if btc_price:
     btc_tp = f"{btc_price * 1.03:,.2f}"
     btc_sl = f"{btc_price * 0.985:,.2f}"
@@ -95,7 +117,7 @@ def send_trading_deals(message):
     xrp_tp, xrp_sl = "---", "---"
 
   deals_text = (
-      "📊 **الأسعار الفورية واللحظية للعملات الرقمية (Binance Live):**\n\n"
+      "📊 **الأسعار الفورية واللحظية للعملات الرقمية (Live Feed):**\n\n"
       f"🔹 **BTC/USDT**\n"
       f"  • السعر الحالي: `{btc_str}` USDT 🟢\n"
       f"  • الهدف المقترح (TP +3%): {btc_tp} 🎯\n"
@@ -112,8 +134,7 @@ def send_trading_deals(message):
       "• **السكالبينج:** ربح سريع (0.5% - 1%) مع وقف خسارة ضيق.\n"
       "• **اليومية:** أهداف مدروسة (2% - 3%) تغلق بنهاية اليوم.\n"
       "• **طويلة الأمد:** أهداف كبرى (+5% فأكثر) بدون رافعة مالية.\n\n"
-      "⚠️ **ملاحظة:** الأسعار تتحدث فوريًا في كل مرة تضغط فيها على هذا الزر"
-      " (تداول فوري Spot آمن تماماً)."
+      "⚠️ **ملاحظة:** تداول فوري (Spot) آمن تماماً لإدارة المخاطر."
   )
   bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
 
@@ -132,9 +153,7 @@ def send_gold_deals(message):
       "📈 **2️⃣ صفقات الذهب طويلة الأمد (Long-term):**\n"
       "• **النوع:** استثمار وتجميع متوسط إلى طويل المدى.\n"
       "• **الهدف (TP):** أهداف كبرى تبدأ من (+5% إلى +10%).\n"
-      "• **الحماية:** التجميع التدريجي بدون رافعة مالية لحماية القيمة الشرائية.\n\n"
-      "👑 **القاعدة الذهبية للذهب:** لا تدخل صفقات الذهب طويلة الأمد بمبالغ"
-      " مضاربة قصيرة، واعتمد دائماً على التجميع الهادئ."
+      "• **الحماية:** التجميع التدريجي بدون رافعة مالية لحماية القيمة الشرائية."
   )
   bot.send_message(message.chat.id, gold_text, parse_mode="Markdown")
 
