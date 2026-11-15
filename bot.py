@@ -15,36 +15,23 @@ def home():
   return "Bot is running 24/7!"
 
 
-# القائمة الرئيسية
+# القائمة الرئيسية والأزرار الأربعة الاحترافية
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
   markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-  btn1 = types.KeyboardButton("📚 الأكاديمية")
-  btn2 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار")
-  btn3 = types.KeyboardButton("🌐 المنصات العالمية")
-  markup.add(btn1, btn2, btn3)
+  btn1 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار")
+  btn2 = types.KeyboardButton("📚 الأكاديمية الشاملة (من الصفر للاحتراف)")
+  btn3 = types.KeyboardButton("🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)")
+  btn4 = types.KeyboardButton("💳 معلومات الدفع والشحن (شام كاش)")
+  markup.add(btn1, btn2, btn3, btn4)
 
   welcome_text = (
-      "مرحباً بك في بوت التداول والأكاديمية الرقمية!\nاختر ما يناسبك من"
-      " القائمة أدناه:"
+      "أهلاً بك في بوت التداول الذكي الشامل! 🤖\nاختر من الأزرار أدناه للبدء:"
   )
   bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
 
 
-# قسم الأكاديمية
-@bot.message_handler(func=lambda message: message.text == "📚 الأكاديمية")
-def send_academy(message):
-  academy_text = (
-      "1️⃣ **المستوى الأول: أساسيات التداول الرقمي**\n\n"
-      "• **ما هو التداول؟** بيع وشراء الأصول الرقمية لتحقيق الربح من فروق"
-      " الأسعار.\n• **ما هو زوج العملات (مثل BTC/USDT)؟** الطرف الأيسر هو العملة"
-      " المتداولة (البيتكوين)، والطرف الأيمن هو عملة التقييم (الدولار الرقمي"
-      " USDT).\n• **السوق الرقمي:** يعمل 24 ساعة طوال أيام الأسبوع."
-  )
-  bot.send_message(message.chat.id, academy_text, parse_mode="Markdown")
-
-
-# قسم الصفقات المقترحة (النسخة الثابتة والمستقرة)
+# قسم الصفقات المقترحة والأسعار
 @bot.message_handler(
     func=lambda message: message.text == "📊 الصفقات المقترحة والأسعار"
 )
@@ -68,14 +55,53 @@ def send_trading_deals(message):
   bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
 
 
-# قسم المنصات العالمية
-@bot.message_handler(func=lambda message: message.text == "🌐 المنصات العالمية")
-def send_platforms(message):
-  bot.send_message(
-      message.chat.id,
-      "🌐 يمكنك تداول العملات الرقمية عبر أشهر المنصات العالمية مثل Binance و"
-      " Bybit.",
+# قسم الأكاديمية الشاملة
+@bot.message_handler(
+    func=lambda message: message.text
+    == "📚 الأكاديمية الشاملة (من الصفر للاحتراف)"
+)
+def send_academy(message):
+  academy_text = (
+      "📚 **الأكاديمية الشاملة - المستوى الأول:**\n\n"
+      "1️⃣ **ما هو التداول؟** بيع وشراء الأصول الرقمية لتحقيق الربح من فروق"
+      " الأسعار.\n"
+      "2️⃣ **ما هو زوج العملات (مثل BTC/USDT)؟** الطرف الأيسر هو العملة"
+      " المتداولة، والطرف الأيمن هو عملة التقييم (USDT).\n"
+      "3️⃣ **إدارة المخاطر:** السر الأساسي للاستمرار والنجاح في السوق الرقمي"
+      " الذي يعمل 24/7."
   )
+  bot.send_message(message.chat.id, academy_text, parse_mode="Markdown")
+
+
+# قسم فتح الحسابات وإنشاء المحافظ
+@bot.message_handler(
+    func=lambda message: message.text
+    == "🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)"
+)
+def send_accounts_guide(message):
+  guide_text = (
+      "🌐 **دليل فتح الحسابات وإنشاء المحافظ:**\n\n"
+      "• **منصة Binance / Bybit:** يتم التسجيل عبر البريد الإلكتروني وتوثيق"
+      " الحساب (KYC) لضمان الأمان الكامل.\n"
+      "• **المحافظ اللامركزية:** مثل Trust Wallet أو MetaMask لتخزين الأصول"
+      " بشكل آمن مع الاحتفاظ بعبارة الاسترداد (Seed Phrase)."
+  )
+  bot.send_message(message.chat.id, guide_text, parse_mode="Markdown")
+
+
+# قسم معلومات الدفع والشحن (شام كاش)
+@bot.message_handler(
+    func=lambda message: message.text == "💳 معلومات الدفع والشحن (شام كاش)"
+)
+def send_payment_info(message):
+  payment_text = (
+      "💳 **معلومات الدفع والشحن (شام كاش):**\n\n"
+      "• يمكنك إتمام عمليات الإيداع والشحن بسهولة وبشكل آمن عبر خدمة **شام"
+      " كاش**.\n"
+      "• يرجى التواصل مع الدعم أو المعرف المعتمد لإتمام عملية التحويل وتأكيد"
+      " رصيدك بدقة."
+  )
+  bot.send_message(message.chat.id, payment_text, parse_mode="Markdown")
 
 
 # تشغيل البوت مع سيرفر الـ Flask
