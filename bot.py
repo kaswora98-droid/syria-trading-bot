@@ -2,6 +2,8 @@ from datetime import datetime, timedelta
 import json
 import os
 import random
+import threading
+import time
 from flask import Flask, request
 import requests
 import telebot
@@ -19,13 +21,14 @@ ADMIN_ID = 8611033531
 ADMIN_USERNAME = "@alone123987"  # معرفك للتواصل
 
 DATA_FILE = "users_data.json"
+GROUPS_FILE = "groups_data.json"
 banned_users = set()
 
 app = Flask(__name__)
 RENDER_URL = "https://syria-trading-bot.onrender.com"
 
 
-# --- دوال حفظ واسترجاع بيانات الاشتراكات ---
+# --- دوال حفظ واسترجاع بيانات المشتركين والمجموعات ---
 def load_users():
   if os.path.exists(DATA_FILE):
     try:
@@ -44,12 +47,31 @@ def save_users(data):
     pass
 
 
+def load_groups():
+  if os.path.exists(GROUPS_FILE):
+    try:
+      with open(GROUPS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+    except Exception:
+      return []
+  return []
+
+
+def save_groups(groups_list):
+  try:
+    with open(GROUPS_FILE, "w", encoding="utf-8") as f:
+      json.dump(groups_list, f, ensure_ascii=False, indent=4)
+  except Exception:
+    pass
+
+
 all_users = load_users()
+active_groups = load_groups()
 
 
 @app.route("/")
 def home():
-  return "Bot is running 24/7 with Live Prices & Persistent Menu!"
+  return "Bot is running 24/7 with Live Prices, Referrals & Safe Auto-Promo!"
 
 
 @app.route("/ping")
@@ -79,7 +101,6 @@ def get_crypto_prices():
   except Exception:
     pass
 
-  # خط دفاع أخير يتغير قليلاً لضمان عدم ثبات الأرقام كلياً في حال انقطاع الشبكة
   return (
       64950.0 + random.randint(-15, 15),
       1815.0 + random.randint(-8, 8),
@@ -104,7 +125,92 @@ def check_subscription(bot_instance, message):
     bot.reply_to(message, "⛔ تم حظرك من استخدام هذا البوت. يرجى مراجعة الإدارة.")
     return True
 
-  # 2. منح 3 أيام تجريبية تلقائية للمستخدم الجديد
+  # 2. فحص انتهاء الصلاحية للمستخدمين المسجلين مسبقاً (في المحادثات الخاصة فقط)
+  if message.chat.type == "private" and uid_str in all_users:
+    user_data = all_users[uid_str]
+    expiry_dt = datetime.fromisoformat(user_data["expiry"])
+    if datetime.now() > expiry_dt:
+      lock_msg = (
+          "🔒 **انتهت صلاحية استخدامك للبوت!**\n\n"
+          "لقد انتهت فترتك التجريبية (3 أيام) أو مدة اشتراكك الشهري.\n"
+          "لإعادة تفعيل البوت أو عبر دعوة أصدقائك عبر رابط الدعوة الخاص بك:\n\n"
+          f"📩 تواصل مع المطور: {ADMIN_USERNAME}\n"
+          f"🆔 رقم حسابك (ID): `{user_id}`"
+      )
+      bot.send_message(message.chat.id, lock_msg, parse_mode="Markdown")
+      return True
+
+
+# متابعة إضافة البوت إلى المجموعات أو القنوات وحفظها تلقائياً
+@bot.my_chat_member_handler()
+def handle_chat_member(message):
+  global active_groups
+  chat = message.chat
+  new_status = message.new_chat_member.status
+
+  if chat.type in ["group", "supergroup", "channel"]:
+    if new_status in ["administrator", "member"]:
+      if chat.id not in active_groups:
+        active_groups.append(chat.id)
+        save_groups(active_groups)
+    elif new_status in ["left", "kicked"]:
+      if chat.id in active_groups:
+        active_groups.remove(chat.id)
+        save_groups(active_groups)
+
+
+# 🔄 دالة الترويج التلقائي الآمن في الخلفية (تعمل مرة كل 24 ساعة لكل مجموعة بفاصل آمن)
+def background_auto_promo():
+  while True:
+    # الانتظار 24 ساعة كاملة بين كل حملة ترويجية وأخرى (أمان تام ضد الحظر)
+    time.sleep(86400)
+
+    if not active_groups:
+      continue
+
+    promo_text = (
+        "🤖 **بوت التداول الذكي الشامل في سوريا** 🇸🇾\n\n"
+        "📊 احصل على الصفقات الفورية للعملات الرقمية (Bitcoin, Ethereum, Ripple) وتوصيات الذهب اليومية بدقة عالية!\n"
+        "📚 أكاديمية شاملة من الصفر للاحتراف وإدارة المخاطر.\n"
+        "💳 دعم كامل لخدمات السحب والإيداع المحلي (شام كاش) ومنصات التداول.\n\n"
+        "🎁 **فترة تجريبية مجانية لمدة 3 أيام لجميع المشتركين الجدد!**\n"
+        f"📩 للاشتراك والاستفسار تواصل مع المطور حصرياً: {ADMIN_USERNAME}"
+    )
+
+    for group_id in list(active_groups):
+      try:
+        bot.send_message(group_id, promo_text, parse_mode="Markdown")
+        # فاصل زمني آمن (5 ثوانٍ) بين كل مجموعة وأخرى لعدم إزعاج خوادم تيليجرام
+        time.sleep(5)
+      except Exception:
+        # إذا تم طرد البوت أو أُغلقت المجموعة، نقوم بإزالتها من القائمة
+        if group_id in active_groups:
+          active_groups.remove(group_id)
+          save_groups(active_groups)
+
+
+# تشغيل خيط الترويج التلقائي في الخلفية بشكل آمن
+promo_thread = threading.Thread(target=background_auto_promo, daemon=True)
+promo_thread.start()
+
+
+# أمر البدء (يدعم نظام الإحالة والدعوات تلقائياً)
+@bot.message_handler(commands=["start"])
+def send_welcome(message):
+  if message.chat.type != "private":
+    return  # البوت يتفاعل مع أمر البدء في الخاص فقط
+
+  user_id = message.from_user.id
+  uid_str = str(user_id)
+  text_parts = message.text.split()
+
+  referrer_id = None
+  if len(text_parts) > 1 and text_parts[1].startswith("ref_"):
+    try:
+      referrer_id = text_parts[1].replace("ref_", "")
+    except Exception:
+      pass
+
   if uid_str not in all_users:
     expiry_date = datetime.now() + timedelta(days=3)
     all_users[uid_str] = {
@@ -112,46 +218,47 @@ def check_subscription(bot_instance, message):
         "username": message.from_user.username or "لا يوجد",
         "expiry": expiry_date.isoformat(),
         "is_trial": True,
+        "invited_by": referrer_id,
+        "referral_count": 0,
     }
+
+    if referrer_id and referrer_id in all_users and referrer_id != uid_str:
+      all_users[referrer_id]["referral_count"] = (
+          all_users[referrer_id].get("referral_count", 0) + 1
+      )
+      ref_current_exp = datetime.fromisoformat(all_users[referrer_id]["expiry"])
+      ref_new_exp = max(ref_current_exp, datetime.now()) + timedelta(days=2)
+      all_users[referrer_id]["expiry"] = ref_new_exp.isoformat()
+
+      try:
+        bot.send_message(
+            int(referrer_id),
+            "🎉 **مبروك! انضم شخص جديد عبر رابط الدعوة الخاص بك.**\n"
+            "🎁 تمت إضافة **يومين رصيد إضافي** لتجربتك واشتراكك تلقائياً!",
+            parse_mode="Markdown",
+        )
+      except Exception:
+        pass
+
     save_users(all_users)
 
     try:
       bot.send_message(
           ADMIN_ID,
-          f"🚨 **مشترك جديد بدأ الفترة التجريبية (3 أيام)!**\n"
+          f"🚨 **مشترك جديد انضم للبوت!**\n"
           f"👤 الاسم: {all_users[uid_str]['name']}\n"
           f"🏷️ المعرف: @{all_users[uid_str]['username']}\n"
           f"🆔 الآي دي: `{user_id}`\n"
-          f"⏳ ينتهي في: `{expiry_date.strftime('%Y-%m-%d %H:%M')}`",
+          (
+              f"🔗 دُعي بواسطة الآي دي: `{referrer_id}`"
+              if referrer_id
+              else "🔗 انضم مباشرة"
+          ),
           parse_mode="Markdown",
       )
     except Exception:
       pass
-    return
 
-  # 3. فحص انتهاء الصلاحية
-  user_data = all_users[uid_str]
-  expiry_dt = datetime.fromisoformat(user_data["expiry"])
-
-  if datetime.now() > expiry_dt:
-    lock_msg = (
-        "🔒 **انتهت صلاحية استخدامك للبوت!**\n\n"
-        "لقد انتهت فترتك التجريبية (3 أيام) أو مدة اشتراكك الشهري.\n"
-        "لإعادة تفعيل البوت والاستمرار في الحصول على الصفقات الفورية والتوصيات:\n\n"
-        f"📩 يرجى التواصل ودفع الاشتراك مع المطور: {ADMIN_USERNAME}\n"
-        f"🆔 أرسل له رقم حسابك (ID) لتفعيل الاشتراك فوراً:\n`{user_id}`"
-    )
-    bot.send_message(message.chat.id, lock_msg, parse_mode="Markdown")
-    return True
-
-
-# أمر البدء والأزرار الثابتة في أسفل الدردشة (الزر المثبت المدمج)
-@bot.message_handler(commands=["start"])
-def send_welcome(message):
-  user_id = message.from_user.id
-  uid_str = str(user_id)
-
-  # بناء لوحة المفاتيح الثابتة والمستمرة أسفل المحادثة
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
   )
@@ -162,7 +269,7 @@ def send_welcome(message):
   btn4 = types.KeyboardButton("🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)")
   btn5 = types.KeyboardButton("📥 دليل السحب والإيداع في المنصات")
   btn6 = types.KeyboardButton("💳 معلومات الدفع والشحن (شام كاش)")
-  btn7 = types.KeyboardButton("⏳ حالة اشتراكي")
+  btn7 = types.KeyboardButton("⏳ حالة اشتراكي ورابط دعوة أصدقائي")
 
   if user_id == ADMIN_ID:
     btn_admin = types.KeyboardButton("🛠️ لوحة تحكم المطور")
@@ -173,19 +280,16 @@ def send_welcome(message):
     )
   else:
     markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7)
-    if uid_str in all_users:
-      expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
-      remaining = expiry_dt - datetime.now()
-      days_left = max(0, remaining.days)
-      hours_left = max(0, remaining.seconds // 3600)
-      sub_status = f"نشط (المتبقي: {days_left} يوم و {hours_left} ساعة)"
-    else:
-      sub_status = "قيد التفعيل"
+    expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
+    remaining = expiry_dt - datetime.now()
+    days_left = max(0, remaining.days)
+    hours_left = max(0, remaining.seconds // 3600)
+    sub_status = f"نشط (المتبقي: {days_left} يوم و {hours_left} ساعة)"
 
     welcome_text = (
         "أهلاً بك في بوت التداول الذكي الشامل! 🤖\n\n"
         f"✅ **حالة الحساب:** {sub_status}\n"
-        "يمكنك الوصول إلى كافة الخيارات فوراً عبر الأزرار المثبتة أسفل"
+        "يمكنك الوصول إلى كافة الخيارات ورابط دعوتك عبر الأزرار المثبتة أسفل"
         " الشاشة:"
     )
 
@@ -194,25 +298,45 @@ def send_welcome(message):
   )
 
 
-# زر حالة الاشتراك للمستخدم
-@bot.message_handler(func=lambda message: message.text == "⏳ حالة اشتراكي")
-def check_my_status(message):
-  uid_str = str(message.from_user.id)
-  if message.from_user.id == ADMIN_ID:
+# زر حالة الاشتراك ورابط الدعوة الخاص بالمستخدم
+@bot.message_handler(
+    func=lambda message: message.text == "⏳ حالة اشتراكي ورابط دعوة أصدقائي"
+)
+def check_my_status_and_ref(message):
+  user_id = message.from_user.id
+  uid_str = str(user_id)
+
+  if user_id == ADMIN_ID:
     bot.send_message(
         message.chat.id, "👑 أنت المالك والمطور، اشتراكك مفتوح مدى الحياة!"
     )
     return
 
-  expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
+  user_info = all_users.get(
+      uid_str,
+      {
+          "expiry": (datetime.now() + timedelta(days=3)).isoformat(),
+          "referral_count": 0,
+      },
+  )
+  expiry_dt = datetime.fromisoformat(user_info["expiry"])
   remaining = expiry_dt - datetime.now()
+  ref_count = user_info.get("referral_count", 0)
+
+  bot_username = bot.get_me().username
+  ref_link = f"https://t.me/{bot_username}?start=ref_{uid_str}"
+
   status_text = (
-      "📋 **تفاصيل اشتراكك:**\n\n"
+      "📋 **تفاصيل اشتراكك ورابط دعوتك:**\n\n"
       f"🆔 رقم حسابك: `{uid_str}`\n"
       f"📅 تاريخ الانتهاء: `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n"
       f"⏳ الوقت المتبقي: **{remaining.days} يوم و {remaining.seconds // 3600}"
-      " ساعة**\n\n"
-      f"لتجديد الاشتراك تواصل مع الإدارة: {ADMIN_USERNAME}"
+      " ساعة**\n"
+      f"👥 عدد الأشخاص الذين دعوتهم: **{ref_count} شخص** (تحصل على يومين إضافيين"
+      " لكل صديق يدخل عبر رابطك!)\n\n"
+      "🔗 **رابط الدعوة الخاص بك (انسخه وانشره لأصدقائك):**\n"
+      f"`{ref_link}`\n\n"
+      f"لتجديد الاشتراك رسمياً تواصل مع الإدارة: {ADMIN_USERNAME}"
   )
   bot.send_message(message.chat.id, status_text, parse_mode="Markdown")
 
@@ -226,11 +350,10 @@ def admin_panel(message):
       "👑 **لوحة تحكم المطور والاشتراكات**\n\n"
       "الأوامر المتاحة لك:\n"
       "1️⃣ **تفعيل أو تمديد اشتراك (أيام):**\n"
-      "`/add_days [ID] [عدد_الأيام]`\n"
-      "مثال: `/add_days 8611033531 30`\n\n"
+      "`/add_days [ID] [عدد_الأيام]`\n\n"
       "2️⃣ **قفل البوت فوراً عن مستخدم:**\n"
       "`/expire [ID]`\n\n"
-      "3️⃣ **عرض جميع المشتركين:**\n"
+      "3️⃣ **عرض جميع المشتركين والمجموعات:**\n"
       "`/stats`\n\n"
       "4️⃣ **حظر / فك حظر:**\n"
       "`/ban [ID]` أو `/unban [ID]`"
@@ -262,6 +385,7 @@ def add_subscription_days(message):
           "username": "غير معروف",
           "expiry": new_expiry.isoformat(),
           "is_trial": False,
+          "referral_count": 0,
       }
 
     save_users(all_users)
@@ -319,15 +443,13 @@ def expire_subscription(message):
     )
 
 
-# عرض إحصائيات المشتركين
+# عرض إحصائيات المشتركين والمجموعات النشطة للترويج
 @bot.message_handler(commands=["stats"])
 def show_stats(message):
   if message.from_user.id != ADMIN_ID:
     return
   count = len(all_users)
-  if count == 0:
-    bot.send_message(message.chat.id, "📊 لا يوجد مشتركين مسجلين بعد.")
-    return
+  groups_count = len(active_groups)
 
   now = datetime.now()
   lines = []
@@ -335,12 +457,16 @@ def show_stats(message):
     exp = datetime.fromisoformat(info["expiry"])
     status = "🟢 نشط" if exp > now else "🔴 منتهي"
     rem_days = (exp - now).days if exp > now else 0
+    refs = info.get("referral_count", 0)
     lines.append(
         f"• {info['name']} (@{info['username']})\n  🆔 `{uid}` | {status}"
-        f" ({rem_days} يوم)"
+        f" ({rem_days} يوم) | 👥 دعوات: {refs}"
     )
 
-  report = f"📊 **إحصائيات المشتركين ({count}):**\n\n" + "\n\n".join(lines)
+  report = (
+      f"📊 **إحصائيات المشتركين ({count}) والمجموعات الإعلانية"
+      f" ({groups_count}):**\n\n"
+  ) + "\n\n".join(lines)
   bot.send_message(message.chat.id, report, parse_mode="Markdown")
 
 
