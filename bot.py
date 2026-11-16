@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+import json
 import os
 from flask import Flask, request
 import requests
@@ -13,19 +15,40 @@ bot = telebot.TeleBot(TOKEN)
 
 # 🆔 الآي دي الخاص بك (المسؤول والمنشئ)
 ADMIN_ID = 8611033531
+ADMIN_USERNAME = "@alone123987"  # معرفك للتواصل عند انتهاء الاشتراك
 
-# قائمة المستخدمين المحظورين
+DATA_FILE = "users_data.json"
 banned_users = set()
-# قائمة لتسجيل المستخدمين الذين يدخلون البوت
-all_users = {}
 
 app = Flask(__name__)
 RENDER_URL = "https://syria-trading-bot.onrender.com"
 
 
+# --- دوال حفظ واسترجاع بيانات الاشتراكات ---
+def load_users():
+  if os.path.exists(DATA_FILE):
+    try:
+      with open(DATA_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+    except Exception:
+      return {}
+  return {}
+
+
+def save_users(data):
+  try:
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+      json.dump(data, f, ensure_ascii=False, indent=4)
+  except Exception:
+    pass
+
+
+all_users = load_users()
+
+
 @app.route("/")
 def home():
-  return "Bot is running 24/7!"
+  return "Bot is running 24/7 with Subscription System!"
 
 
 @app.route("/ping")
@@ -86,33 +109,71 @@ def get_crypto_prices():
   return 64950.0, 1815.0, 0.52
 
 
-# حارس أمني لفحص الحظر
+# 🛡️ الحارس الأمني: يفحص الحظر وصلاحية الاشتراك (الـ 3 أيام التجريبية أو الاشتراك المدفوع)
 @bot.middleware_handler(update_types=["message"])
-def check_ban(bot_instance, message):
+def check_subscription(bot_instance, message):
+  if not message.from_user:
+    return
   user_id = message.from_user.id
+  uid_str = str(user_id)
+
+  # استثناء المدير (أنت) من أي قيود
+  if user_id == ADMIN_ID:
+    return
+
+  # 1. فحص الحظر اليدوي
   if user_id in banned_users:
     bot.reply_to(message, "⛔ تم حظرك من استخدام هذا البوت. يرجى مراجعة الإدارة.")
     return True
 
+  # 2. تسجيل المستخدم الجديد ومنحه 3 أيام تجريبية تلقائياً
+  if uid_str not in all_users:
+    expiry_date = datetime.now() + timedelta(days=3)
+    all_users[uid_str] = {
+        "name": message.from_user.first_name or "بدون اسم",
+        "username": message.from_user.username or "لا يوجد",
+        "expiry": expiry_date.isoformat(),
+        "is_trial": True,
+    }
+    save_users(all_users)
 
-# أمر البدء وتسجيل المستخدمين وإرسال إشعار لك
-@bot.message_handler(commands=["start"])
-def send_welcome(message):
-  user_id = message.from_user.id
-  user_name = message.from_user.first_name
-  username = message.from_user.username
-
-  if user_id not in all_users and user_id != ADMIN_ID:
-    all_users[user_id] = {"name": user_name, "username": username}
+    # إرسال إشعار فوري لك بدخول مشترك جديد في الفترة التجريبية
     try:
       bot.send_message(
           ADMIN_ID,
-          f"🚨 **مستخدم جديد دخل البوت!**\n👤 الاسم: {user_name}\n🏷️ المعرف:"
-          f" @{username}\n🆔 الآي دي: `{user_id}`",
+          f"🚨 **مشترك جديد بدأ الفترة التجريبية (3 أيام)!**\n"
+          f"👤 الاسم: {all_users[uid_str]['name']}\n"
+          f"🏷️ المعرف: @{all_users[uid_str]['username']}\n"
+          f"🆔 الآي دي: `{user_id}`\n"
+          f"⏳ ينتهي في: `{expiry_date.strftime('%Y-%m-%d %H:%M')}`",
           parse_mode="Markdown",
       )
     except Exception:
       pass
+    return  # السماح له بالمرور لأن فترته بدأت للتو
+
+  # 3. فحص انتهاء الصلاحية للمستخدمين المسجلين مسبقاً
+  user_data = all_users[uid_str]
+  expiry_dt = datetime.fromisoformat(user_data["expiry"])
+
+  if datetime.now() > expiry_dt:
+    lock_msg = (
+        "🔒 **انتهت صلاحية استخدامك للبوت!**\n\n"
+        "لقد انتهت فترتك التجريبية (3 أيام) أو مدة اشتراكك الشهري.\n"
+        "لإعادة تفعيل البوت والاستمرار في الحصول على الصفقات الفورية والتوصيات"
+        " الآمنة:\n\n"
+        f"📩 يرجى التواصل ودفع الاشتراك مع المطور: {ADMIN_USERNAME}\n"
+        f"🆔 أرسل له رقم حسابك (ID) لتفعيل الاشتراك فوراً:\n`{user_id}`"
+    )
+    bot.send_message(message.chat.id, lock_msg, parse_mode="Markdown")
+    return True  # إيقاف البوت ومنع تنفيذ أي أمر آخر
+
+
+# أمر البدء
+@bot.message_handler(commands=["start"])
+def send_welcome(message):
+  user_id = message.from_user.id
+  uid_str = str(user_id)
 
   markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
   btn1 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار (Crypto)")
@@ -121,17 +182,55 @@ def send_welcome(message):
   btn4 = types.KeyboardButton("🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)")
   btn5 = types.KeyboardButton("📥 دليل السحب والإيداع في المنصات")
   btn6 = types.KeyboardButton("💳 معلومات الدفع والشحن (شام كاش)")
+  btn7 = types.KeyboardButton("⏳ حالة اشتراكي")
 
   if user_id == ADMIN_ID:
     btn_admin = types.KeyboardButton("🛠️ لوحة تحكم المطور")
-    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn_admin)
+    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn_admin)
+    welcome_text = (
+        "👑 أهلاً بك يا مهندس أحمد (المطور والمالك)!\nلوحة التحكم جاهزة في"
+        " الأسفل:"
+    )
   else:
-    markup.add(btn1, btn2, btn3, btn4, btn5, btn6)
+    markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7)
+    expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
+    remaining = expiry_dt - datetime.now()
+    days_left = max(0, remaining.days)
+    hours_left = max(0, remaining.seconds // 3600)
 
-  welcome_text = (
-      "أهلاً بك في بوت التداول الذكي الشامل! 🤖\nاختر من الأزرار أدناه للبدء:"
+    welcome_text = (
+        "أهلاً بك في بوت التداول الذكي الشامل! 🤖\n\n"
+        f"✅ **حالة الحساب:** نشط (المتبقي: {days_left} يوم و {hours_left}"
+        " ساعة)\n"
+        "اختر من الأزرار أدناه للبدء:"
+    )
+
+  bot.send_message(
+      message.chat.id, welcome_text, reply_markup=markup, parse_mode="Markdown"
   )
-  bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
+
+
+# زر للمستخدم لمعرفة الوقت المتبقي في اشتراكه
+@bot.message_handler(func=lambda message: message.text == "⏳ حالة اشتراكي")
+def check_my_status(message):
+  uid_str = str(message.from_user.id)
+  if message.from_user.id == ADMIN_ID:
+    bot.send_message(
+        message.chat.id, "👑 أنت المالك والمطور، اشتراكك مفتوح مدى الحياة!"
+    )
+    return
+
+  expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
+  remaining = expiry_dt - datetime.now()
+  status_text = (
+      "📋 **تفاصيل اشتراكك:**\n\n"
+      f"🆔 رقم حسابك: `{uid_str}`\n"
+      f"📅 تاريخ الانتهاء: `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n"
+      f"⏳ الوقت المتبقي: **{remaining.days} يوم و {remaining.seconds // 3600}"
+      " ساعة**\n\n"
+      f"لتجديد الاشتراك تواصل مع الإدارة: {ADMIN_USERNAME}"
+  )
+  bot.send_message(message.chat.id, status_text, parse_mode="Markdown")
 
 
 # 🛠️ لوحة تحكم المطور (تظهر لك وحدك)
@@ -140,80 +239,163 @@ def admin_panel(message):
   if message.from_user.id != ADMIN_ID:
     return
   panel_text = (
-      "👑 **أهلاً بك يا مهندس أحمد (المنشئ والمطور)**\n\n"
-      "أدوات التحكم المتاحة:\n"
-      "• لعرض المشتركين، أرسل: `/stats`\n"
-      "• لحظر مستخدم لم يدفع، أرسل: `/ban [ID]`\n"
-      "• لفك الحظر، أرسل: `/unban [ID]`"
+      "👑 **لوحة تحكم المطور والاشتراكات**\n\n"
+      "الأوامر المتاحة لك:\n"
+      "1️⃣ **تفعيل أو تمديد اشتراك (أيام):**\n"
+      "`/add_days [ID] [عدد_الأيام]`\n"
+      "مثال لشهر: `/add_days 123456789 30`\n\n"
+      "2️⃣ **قفل البوت فوراً عن مستخدم (سحب الأيام):**\n"
+      "`/expire [ID]`\n\n"
+      "3️⃣ **عرض جميع المشتركين وحالة اشتراكهم:**\n"
+      "`/stats`\n\n"
+      "4️⃣ **حظر نهائي / فك حظر:**\n"
+      "`/ban [ID]` أو `/unban [ID]`"
   )
   bot.send_message(message.chat.id, panel_text, parse_mode="Markdown")
 
 
-# عرض إحصائيات المستخدمين
+# أمر إضافة أيام اشتراك لمستخدم: /add_days ID DAYS
+@bot.message_handler(commands=["add_days"])
+def add_subscription_days(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  try:
+    parts = message.text.split()
+    target_id = str(int(parts[1]))
+    days_to_add = int(parts[2])
+
+    now = datetime.now()
+    if target_id in all_users:
+      current_expiry = datetime.fromisoformat(all_users[target_id]["expiry"])
+      # إذا كان اشتراكه ما زال سارياً نضيف فوقه، وإذا كان منتهياً نبدأ من الآن
+      base_date = current_expiry if current_expiry > now else now
+      new_expiry = base_date + timedelta(days=days_to_add)
+      all_users[target_id]["expiry"] = new_expiry.isoformat()
+      all_users[target_id]["is_trial"] = False
+    else:
+      new_expiry = now + timedelta(days=days_to_add)
+      all_users[target_id] = {
+          "name": "مفعل يدوياً",
+          "username": "غير معروف",
+          "expiry": new_expiry.isoformat(),
+          "is_trial": False,
+      }
+
+    save_users(all_users)
+
+    bot.send_message(
+        message.chat.id,
+        f"✅ **تم تفعيل الاشتراك بنجاح!**\n"
+        f"🆔 الحساب: `{target_id}`\n"
+        f"➕ المدة المضافة: **{days_to_add} يوم**\n"
+        f"📅 ينتهي في: `{new_expiry.strftime('%Y-%m-%d %H:%M')}`",
+        parse_mode="Markdown",
+    )
+
+    # إرسال إشعار للمشترك بأن حسابه قد فُعّل
+    try:
+      bot.send_message(
+          int(target_id),
+          f"🎉 **تم تفعيل اشتراكك بنجاح لمدة {days_to_add} يوم!**\n"
+          f"📅 صالح لغاية: `{new_expiry.strftime('%Y-%m-%d %H:%M')}`\n"
+          "أرسل /start للبدء بالتداول الآن.",
+          parse_mode="Markdown",
+      )
+    except Exception:
+      pass
+
+  except Exception:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ صيغة الأمر غير صحيحة.\nاستخدم: `/add_days 123456789 30`",
+        parse_mode="Markdown",
+    )
+
+
+# أمر إنهاء اشتراك مستخدم فوراً: /expire ID
+@bot.message_handler(commands=["expire"])
+def expire_subscription(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  try:
+    target_id = str(int(message.text.split()[1]))
+    if target_id in all_users:
+      all_users[target_id]["expiry"] = (
+          datetime.now() - timedelta(minutes=1)
+      ).isoformat()
+      save_users(all_users)
+      bot.send_message(
+          message.chat.id,
+          f"🔒 تم إنهاء اشتراك الحساب `{target_id}` وقفل البوت عنه فوراً.",
+          parse_mode="Markdown",
+      )
+    else:
+      bot.send_message(message.chat.id, "⚠️ هذا الآي دي غير مسجل في البوت.")
+  except Exception:
+    bot.send_message(
+        message.chat.id, "⚠️ استخدم: `/expire 123456789`", parse_mode="Markdown"
+    )
+
+
+# عرض إحصائيات المستخدمين وحالة اشتراكهم
 @bot.message_handler(commands=["stats"])
 def show_stats(message):
   if message.from_user.id != ADMIN_ID:
     return
   count = len(all_users)
-  users_list = (
-      "\n".join(
-          [
-              f"• {info['name']} (@{info['username']}) - `{uid}`"
-              for uid, info in all_users.items()
-          ]
-      )
-      or "لا توجد سجلات بعد."
-  )
-  bot.send_message(
-      message.chat.id,
-      f"📊 **إحصائيات المستخدمين:**\nعدد المشتركين المسجلين: {count}\n\nقائمة"
-      f" المستخدمين:\n{users_list}",
-      parse_mode="Markdown",
-  )
+  if count == 0:
+    bot.send_message(message.chat.id, "📊 لا يوجد مشتركين مسجلين بعد.")
+    return
+
+  now = datetime.now()
+  lines = []
+  for uid, info in all_users.items():
+    exp = datetime.fromisoformat(info["expiry"])
+    status = "🟢 نشط" if exp > now else "🔴 منتهي"
+    rem_days = (exp - now).days if exp > now else 0
+    lines.append(
+        f"• {info['name']} (@{info['username']})\n  🆔 `{uid}` | {status}"
+        f" ({rem_days} يوم)"
+    )
+
+  report = f"📊 **إحصائيات المشتركين ({count}):**\n\n" + "\n\n".join(lines)
+  bot.send_message(message.chat.id, report, parse_mode="Markdown")
 
 
-# حظر مستخدم
+# حظر وفك حظر
 @bot.message_handler(commands=["ban"])
 def ban_user(message):
   if message.from_user.id != ADMIN_ID:
     return
   try:
-    parts = message.text.split()
-    target_id = int(parts[1])
+    target_id = int(message.text.split()[1])
     banned_users.add(target_id)
     bot.send_message(
         message.chat.id,
-        f"✅ تم حظر المستخدم `{target_id}` بنجاح وإيقاف البوت عنه.",
+        f"✅ تم حظر المستخدم `{target_id}` نهائياً.",
         parse_mode="Markdown",
     )
   except Exception:
-    bot.send_message(
-        message.chat.id, "⚠️ الاستخدام الخاطئ. اكتب هكذا: `/ban 123456789`"
-    )
+    bot.send_message(message.chat.id, "⚠️ استخدم: `/ban 123456789`")
 
 
-# فك الحظر
 @bot.message_handler(commands=["unban"])
 def unban_user(message):
   if message.from_user.id != ADMIN_ID:
     return
   try:
-    parts = message.text.split()
-    target_id = int(parts[1])
-    if target_id in banned_users:
-      banned_users.remove(target_id)
+    target_id = int(message.text.split()[1])
+    banned_users.discard(target_id)
     bot.send_message(
         message.chat.id,
-        f"✅ تم فك الحظر عن المستخدم `{target_id}` وإعادة تفعيل البوت له.",
+        f"✅ تم فك الحظر عن `{target_id}`.",
         parse_mode="Markdown",
     )
   except Exception:
-    bot.send_message(
-        message.chat.id, "⚠️ الاستخدام الخاطئ. اكتب هكذا: `/unban 123456789`"
-    )
+    bot.send_message(message.chat.id, "⚠️ استخدم: `/unban 123456789`")
 
 
-# قسم صفقات العملات الرقمية
+# --- الأقسام الأساسية للبوت ---
 @bot.message_handler(
     func=lambda message: message.text == "📊 الصفقات المقترحة والأسعار (Crypto)"
 )
@@ -234,7 +416,6 @@ def send_trading_deals(message):
   bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
 
 
-# قسم صفقات الذهب
 @bot.message_handler(
     func=lambda message: message.text == "🟡 صفقات الذهب (يومية وطويلة الأمد)"
 )
@@ -253,7 +434,6 @@ def send_gold_deals(message):
   bot.send_message(message.chat.id, gold_text, parse_mode="Markdown")
 
 
-# الأكاديمية الشاملة (التقرير الشامل)
 @bot.message_handler(
     func=lambda message: message.text
     == "📚 الأكاديمية الشاملة (من الصفر للاحتراف)"
@@ -285,7 +465,6 @@ def send_academy(message):
   bot.send_message(message.chat.id, academy_text, parse_mode="Markdown")
 
 
-# دليل فتح الحسابات والمحافظ
 @bot.message_handler(
     func=lambda message: message.text
     == "🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)"
@@ -303,7 +482,6 @@ def send_accounts_guide(message):
   bot.send_message(message.chat.id, guide_text, parse_mode="Markdown")
 
 
-# دليل السحب والإيداع
 @bot.message_handler(
     func=lambda message: message.text == "📥 دليل السحب والإيداع في المنصات"
 )
@@ -318,7 +496,6 @@ def send_deposit_withdraw_guide(message):
   bot.send_message(message.chat.id, dw_text, parse_mode="Markdown")
 
 
-# معلومات الدفع والشحن (شام كاش)
 @bot.message_handler(
     func=lambda message: message.text == "💳 معلومات الدفع والشحن (شام كاش)"
 )
