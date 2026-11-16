@@ -49,7 +49,7 @@ all_users = load_users()
 
 @app.route("/")
 def home():
-  return "Bot is running 24/7 with Live Prices & Subscriptions!"
+  return "Bot is running 24/7 with Live Prices & Persistent Menu!"
 
 
 @app.route("/ping")
@@ -145,13 +145,17 @@ def check_subscription(bot_instance, message):
     return True
 
 
-# أمر البدء
+# أمر البدء والأزرار الثابتة في أسفل الدردشة (الزر المثبت المدمج)
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
   user_id = message.from_user.id
   uid_str = str(user_id)
 
-  markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+  # بناء لوحة المفاتيح الثابتة والمستمرة أسفل المحادثة
+  markup = types.ReplyKeyboardMarkup(
+      resize_keyboard=True, is_persistent=True, row_width=2
+  )
+
   btn1 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار (Crypto)")
   btn2 = types.KeyboardButton("🟡 صفقات الذهب (يومية وطويلة الأمد)")
   btn3 = types.KeyboardButton("📚 الأكاديمية الشاملة (من الصفر للاحتراف)")
@@ -164,21 +168,25 @@ def send_welcome(message):
     btn_admin = types.KeyboardButton("🛠️ لوحة تحكم المطور")
     markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn_admin)
     welcome_text = (
-        "👑 أهلاً بك يا مهندس أحمد (المطور والمالك)!\nلوحة التحكم جاهزة في"
-        " الأسفل:"
+        "👑 أهلاً بك يا مهندس أحمد (المطور والمالك)!\n"
+        "تم تثبيت كافة الخيارات والقوائم في لوحة المفاتيح أدناه:"
     )
   else:
     markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7)
-    expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
-    remaining = expiry_dt - datetime.now()
-    days_left = max(0, remaining.days)
-    hours_left = max(0, remaining.seconds // 3600)
+    if uid_str in all_users:
+      expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
+      remaining = expiry_dt - datetime.now()
+      days_left = max(0, remaining.days)
+      hours_left = max(0, remaining.seconds // 3600)
+      sub_status = f"نشط (المتبقي: {days_left} يوم و {hours_left} ساعة)"
+    else:
+      sub_status = "قيد التفعيل"
 
     welcome_text = (
         "أهلاً بك في بوت التداول الذكي الشامل! 🤖\n\n"
-        f"✅ **حالة الحساب:** نشط (المتبقي: {days_left} يوم و {hours_left}"
-        " ساعة)\n"
-        "اختر من الأزرار أدناه للبدء:"
+        f"✅ **حالة الحساب:** {sub_status}\n"
+        "يمكنك الوصول إلى كافة الخيارات فوراً عبر الأزرار المثبتة أسفل"
+        " الشاشة:"
     )
 
   bot.send_message(
@@ -219,7 +227,7 @@ def admin_panel(message):
       "الأوامر المتاحة لك:\n"
       "1️⃣ **تفعيل أو تمديد اشتراك (أيام):**\n"
       "`/add_days [ID] [عدد_الأيام]`\n"
-      "مثال لشهر: `/add_days 8611033531 30`\n\n"
+      "مثال: `/add_days 8611033531 30`\n\n"
       "2️⃣ **قفل البوت فوراً عن مستخدم:**\n"
       "`/expire [ID]`\n\n"
       "3️⃣ **عرض جميع المشتركين:**\n"
