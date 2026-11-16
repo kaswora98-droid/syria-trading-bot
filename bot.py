@@ -71,7 +71,7 @@ active_groups = load_groups()
 
 @app.route("/")
 def home():
-  return "Bot is running 24/7 with Live Prices, Trading Study & Safe Auto-Promo!"
+  return "Bot is running 24/7 with Live Prices, All Features & Safe Auto-Promo!"
 
 
 @app.route("/ping")
@@ -159,7 +159,7 @@ def handle_chat_member(message):
         save_groups(active_groups)
 
 
-# 🔄 دالة الترويج التلقائي الآمن في الخلفية (مرة كل 24 ساعة)
+# 🔄 دالة الترويج التلقائي الآمن في الخلفية (مرة كل 24 ساعة - محدثة بالخدمات الجديدة)
 def background_auto_promo():
   while True:
     time.sleep(86400)
@@ -298,9 +298,7 @@ def send_welcome(message):
 
   btn1 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار (Crypto)")
   btn2 = types.KeyboardButton("🟡 صفقات الذهب (يومية وطويلة الأمد)")
-  btn_study = types.KeyboardButton(
-      "📊 دراسة شاملة لأنواع الصفقات والصفقات الأفضل"
-  )  # الزر الجديد
+  btn_study = types.KeyboardButton("📊 دراسة شاملة لأنواع الصفقات والصفقات الأفضل")
   btn3 = types.KeyboardButton("📚 الأكاديمية الشاملة (من الصفر للاحتراف)")
   btn_glossary = types.KeyboardButton("📖 قاموس مصطلحات التداول وشرحها")
   btn4 = types.KeyboardButton("🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)")
@@ -324,7 +322,7 @@ def send_welcome(message):
     )
     welcome_text = (
         "👑 أهلاً بك يا مهندس أحمد (المطور والمالك)!\n"
-        "تم تثبيت كافة الخيارات والقوائم ومن ضمنها دراسة الصفقات أدناه:"
+        "تم تثبيت كافة الخيارات والقوائم ومن ضمنها الأقسام الجديدة أدناه:"
     )
   else:
     markup.add(
@@ -339,7 +337,7 @@ def send_welcome(message):
     welcome_text = (
         "أهلاً بك في بوت التداول الذكي الشامل! 🤖\n\n"
         f"✅ **حالة الحساب:** {sub_status}\n"
-        "يمكنك الوصول إلى كافة الخيارات ودراسة الصفقات عبر الأزرار المثبتة أسفل"
+        "يمكنك الوصول إلى كافة الخيارات والأقسام عبر الأزرار المثبتة أسفل"
         " الشاشة:"
     )
 
@@ -591,10 +589,9 @@ def send_gold_deals(message):
       "• **الهدف (TP):** أهداف كبرى تبدأ من (+5% إلى +10%).\n"
       "• **الحماية:** التجميع التدريجي بدون رافعة مالية لحماية القيمة الشرائية."
   )
-  bot.send_message(message.chat.id, gold_text, parse_node="Markdown")
+  bot.send_message(message.chat.id, gold_text, parse_mode="Markdown")
 
 
-# القسم الجديد: دراسة شاملة لأنواع الصفقات والصفقات الأفضل لكل نوع
 @bot.message_handler(
     func=lambda message: message.text
     == "📊 دراسة شاملة لأنواع الصفقات والصفقات الأفضل"
