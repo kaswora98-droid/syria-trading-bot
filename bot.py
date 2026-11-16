@@ -159,12 +159,10 @@ def handle_chat_member(message):
         save_groups(active_groups)
 
 
-# 🔄 دالة الترويج التلقائي الآمن في الخلفية (تعمل مرة كل 24 ساعة لكل مجموعة بفاصل آمن)
+# 🔄 دالة الترويج التلقائي الآمن في الخلفية (مرة كل 24 ساعة)
 def background_auto_promo():
   while True:
-    # الانتظار 24 ساعة كاملة بين كل حملة ترويجية وأخرى (أمان تام ضد الحظر)
     time.sleep(86400)
-
     if not active_groups:
       continue
 
@@ -180,25 +178,60 @@ def background_auto_promo():
     for group_id in list(active_groups):
       try:
         bot.send_message(group_id, promo_text, parse_mode="Markdown")
-        # فاصل زمني آمن (5 ثوانٍ) بين كل مجموعة وأخرى لعدم إزعاج خوادم تيليجرام
         time.sleep(5)
       except Exception:
-        # إذا تم طرد البوت أو أُغلقت المجموعة، نقوم بإزالتها من القائمة
         if group_id in active_groups:
           active_groups.remove(group_id)
           save_groups(active_groups)
 
 
-# تشغيل خيط الترويج التلقائي في الخلفية بشكل آمن
 promo_thread = threading.Thread(target=background_auto_promo, daemon=True)
 promo_thread.start()
+
+
+# أمر التجربة الفورية للترويج (خاص بك كمطور)
+@bot.message_handler(commands=["test_promo"])
+def test_promo_command(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  if not active_groups:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ البوت ليس مشرفاً في أي مجموعة أو قناة مسجلة حتى الآن!",
+    )
+    return
+
+  promo_text = (
+      "🤖 **بوت التداول الذكي الشامل في سوريا** 🇸🇾\n\n"
+      "📊 احصل على الصفقات الفورية للعملات الرقمية وتوصيات الذهب اليومية بدقة عالية!\n"
+      "📚 أكاديمية شاملة من الصفر للاحتراف وإدارة المخاطر.\n"
+      "💳 دعم كامل لخدمات السحب والإيداع المحلي (شام كاش) ومنصات التداول.\n\n"
+      "🎁 **فترة تجريبية مجانية لمدة 3 أيام لجميع المشتركين الجدد!**\n"
+      f"📩 للاشتراك والاستفسار تواصل مع المطور حصرياً: {ADMIN_USERNAME}"
+  )
+
+  success_count = 0
+  for group_id in active_groups:
+    try:
+      bot.send_message(group_id, promo_text, parse_mode="Markdown")
+      success_count += 1
+    except Exception as e:
+      bot.send_message(
+          message.chat.id, f"⚠️ فشل الإرسال للمجموعة `{group_id}`: {e}"
+      )
+
+  bot.send_message(
+      message.chat.id,
+      f"✅ تم إرسال رسالة الترويج التجريبية بنجاح إلى ({success_count})"
+      " مجموعة/قناة.",
+  )
 
 
 # أمر البدء (يدعم نظام الإحالة والدعوات تلقائياً)
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
   if message.chat.type != "private":
-    return  # البوت يتفاعل مع أمر البدء في الخاص فقط
+    return
 
   user_id = message.from_user.id
   uid_str = str(user_id)
@@ -355,7 +388,9 @@ def admin_panel(message):
       "`/expire [ID]`\n\n"
       "3️⃣ **عرض جميع المشتركين والمجموعات:**\n"
       "`/stats`\n\n"
-      "4️⃣ **حظر / فك حظر:**\n"
+      "4️⃣ **تجربة الإرسال الترويجي الفوري:**\n"
+      "`/test_promo`\n\n"
+      "5️⃣ **حظر / فك حظر:**\n"
       "`/ban [ID]` أو `/unban [ID]`"
   )
   bot.send_message(message.chat.id, panel_text, parse_mode="Markdown")
