@@ -2,9 +2,13 @@ import os
 from flask import Flask, request
 import requests
 import telebot
-from telebot import types
+from telebot import apihelper, types  # <-- تم إضافة استيراد apihelper
 
 TOKEN = "8928709566:AAE8G20dfLOqdo7GXJ9APGPqH7OTdyq5leg"
+
+# 🛑 تفعيل الـ Middleware إجبارياً قبل إنشاء كائن البوت لحل الخطأ تماماً
+apihelper.ENABLE_MIDDLEWARE = True
+
 bot = telebot.TeleBot(TOKEN)
 
 # 🆔 الآي دي الخاص بك (المسؤول والمنشئ)
@@ -82,7 +86,7 @@ def get_crypto_prices():
   return 64950.0, 1815.0, 0.52
 
 
-# حارس أمني لفحص الحظر
+# حارس أمني لفحص الحظر (يعمل بسلاسة بعد تفعيل الـ Middleware)
 @bot.middleware_handler(update_types=["message"])
 def check_ban(bot_instance, message):
   user_id = message.from_user.id
