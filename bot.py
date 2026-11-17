@@ -433,14 +433,17 @@ def process_risk_step(message):
     bot.send_message(message.chat.id, "⚠️ حدث خطأ. أعد المحاولة من الزر الرئيسي.")
 
 
-# --- 4. التنبيهات المخصصة ---
+# --- 4. التنبيهات المخصصة المطورة ---
 @bot.message_handler(
     func=lambda message: message.text == "🔔 ضبط تنبيه سعر مخصص (/alert)"
 )
 def custom_alert_guide(message):
   bot.send_message(
       message.chat.id,
-      "🔔 **التنبيهات المخصصة:**\n\nاستخدم الأمر: `/alert btc 68000`",
+      "🔔 **التنبيهات المخصصة:**\n\n"
+      "استخدم الأمر بالشكل الصحيح:\n"
+      "• `/alert btc 68000`\n"
+      "• أو بدون فاصلة عشرية معقدة، مثل: `/alert btc 66220`",
       parse_mode="Markdown",
   )
 
@@ -449,24 +452,38 @@ def custom_alert_guide(message):
 def set_custom_alert(message):
   user_id = message.from_user.id
   parts = message.text.split()
+
   if len(parts) < 3:
     bot.send_message(
-        message.chat.id, "⚠️ استخدم الصيغة: `/alert btc 68000`", parse_mode="Markdown"
+        message.chat.id,
+        "⚠️ الصيغة الصحيحة:\n`/alert btc 68000` أو `/alert eth 1850`",
+        parse_mode="Markdown",
     )
     return
-  asset = parts[1].lower()
+
+  asset = parts[1].replace("/", "").replace("USDT", "").upper()
+  price_str = parts[2].replace(",", "")
+
   try:
-    target_price = float(parts[2])
+    target_price = float(price_str)
     if user_id not in custom_alerts:
       custom_alerts[user_id] = []
+
     custom_alerts[user_id].append({"asset": asset, "price": target_price})
+
     bot.send_message(
         message.chat.id,
-        f"✅ تم ضبط التنبيه عندما يصل `{asset.upper()}` إلى `{target_price}`.",
+        f"✅ **تم ضبط التنبيه بنجاح!**\n"
+        f"• العملة: `{asset}/USDT`\n"
+        f"• السعر المستهدف: `{target_price:,.2f}`",
         parse_mode="Markdown",
     )
   except Exception:
-    bot.send_message(message.chat.id, "⚠️ يرجى إدخال السعر بشكل صحيح.")
+    bot.send_message(
+        message.chat.id,
+        "⚠️ يرجى كتابة السعر بشكل رقُمي صحيح بدون رموز.\n*مثال:* `/alert btc 68000`",
+        parse_mode="Markdown",
+    )
 
 
 # --- 5. موجز الأخبار الاقتصادية اللحظية المفصل ---
@@ -669,7 +686,7 @@ def search_glossary(message):
       ),
       "leverage": (
           "⚖️ **Leverage (أداة الانتحار / الرافعة المالية):**\n"
-          "استدانة أموال من المنصة لمضاعفة حجم الصفقة والأرباح (وتعظيم الخسائر أيضاً). ⚠️ *ننصح المبتدئين بالابتعاد عنها والالزام بالسبوت فقط.*"
+          "استدانة أموال من المنصة لمضاعفة حجم الصفقة والأرباح (وتعظيم الخسائر أيضاً). ⚠️ *ننصح المبتدئين بالابتعاد عنها والالتزام بالسبوت فقط.*"
       ),
       "kyc": (
           "🆔 **KYC (بصمة الهوية المشروطة):**\n"
