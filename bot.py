@@ -2,12 +2,29 @@ import datetime
 import json
 import os
 import random
+from threading import Thread
 import telebot
 from telebot import types
+from flask import Flask
 
-# طريقة احترافية وآمنة: يسحب التوكن من إعدادات Render أو يمكنك وضعه هنا مباشرة بالكامل
-# مثال: TOKEN = "8928709566:ABCdefGhIJKlmNoPQRsTUVwxyZ..."
-TOKEN = os.environ.get("BOT_TOKEN", "8928709566:ضع_التوكن_الكامل_هنا_بدون_فراغات")
+# إعداد خادم الويب البسيط لإرضاء متطلبات البورت في منصة Render
+app = Flask(__name__)
+
+
+@app.route("/")
+def home():
+  return "Syria Trading Bot is running successfully 24/7!"
+
+
+def run_flask():
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port)
+
+
+# --- إعدادات البوت والتوكن ---
+TOKEN = os.environ.get(
+    "BOT_TOKEN", "8928709566:ضع_التوكن_الكامل_هنا_بدون_فراغات"
+)
 bot = telebot.TeleBot(TOKEN)
 
 ADMIN_ID = 8611033531
@@ -197,7 +214,14 @@ def handle_text_messages(message):
     )
 
 
-# تشغيل البوت
+# --- نقطة التشغيل الرئيسية (تشغيل خادم الويب والبوت معاً) ---
 if __name__ == "__main__":
-  print("Bot is running securely...")
+  # تشغيل خادم Flask في خلفية النظام لفتح البورت المطلوب لمنصة Render
+  flask_thread = Thread(target=run_flask)
+  flask_thread.daemon = True
+  flask_thread.start()
+  print("Flask web server started on port 10000...")
+
+  # تشغيل بوت تيليجرام
+  print("Telegram Bot is running securely...")
   bot.infinity_polling()
