@@ -232,11 +232,16 @@ def send_welcome(message):
     except Exception:
       pass
 
+  is_new_user = False
   if uid_str not in all_users:
+    is_new_user = True
     expiry_date = datetime.now() + timedelta(days=3)
+    user_name = message.from_user.first_name or "بدون اسم"
+    user_uname = message.from_user.username or "لا يوجد"
+
     all_users[uid_str] = {
-        "name": message.from_user.first_name or "بدون اسم",
-        "username": message.from_user.username or "لا يوجد",
+        "name": user_name,
+        "username": user_uname,
         "expiry": expiry_date.isoformat(),
         "is_trial": True,
         "invited_by": referrer_id,
@@ -259,6 +264,20 @@ def send_welcome(message):
       except Exception:
         pass
     save_users(all_users)
+
+    # 🔔 إشعار فوري للمطور بانضمام مشترك جديد
+    if user_id != ADMIN_ID:
+      try:
+        admin_alert_text = (
+            "🚨 **مشترك جديد انضم إلى البوت!**\n\n"
+            f"👤 **الاسم:** {user_name}\n"
+            f"🆔 المعرف (ID): `{user_id}`\n"
+            f"🌐 اليوزر: `@{user_uname}`\n"
+            f"👥 إجمالي المشتركين الآن: `{len(all_users)}`"
+        )
+        bot.send_message(ADMIN_ID, admin_alert_text, parse_mode="Markdown")
+      except Exception:
+        pass
 
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
