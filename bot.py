@@ -233,7 +233,7 @@ def check_subscription(bot_instance, message):
       return True
 
 
-# --- القائمة الرئيسية مع أزرار الصفقات والذهب المحدثة ---
+# --- القائمة الرئيسية مع الأزرار المحدثة ---
 def get_main_menu(user_id):
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
@@ -387,7 +387,7 @@ def send_with_menu(message, text):
   )
 
 
-# --- صفقات القاعدة الذهبية للعملات ---
+# --- صفقات القاعدة الذهبية للعملات (مع وقف الخسارة المحسوب) ---
 @bot.message_handler(func=lambda message: message.text == "📊 صفقات القاعدة الذهبية")
 def send_golden_rule_deals(message):
   btc, eth, xrp = get_crypto_prices()
@@ -399,24 +399,31 @@ def send_golden_rule_deals(message):
   eth_tp1_pct = calculate_profit_percentage(eth, eth * 1.03, "BUY")
   eth_tp2_pct = calculate_profit_percentage(eth, eth * 1.06, "BUY")
 
+  xrp_sl = xrp * (1 - 0.012)
+  btc_sl = btc * (1 - 0.012)
+  eth_sl = eth * (1 - 0.012)
+
   deals_text = (
       "📊 **صفقات القاعدة الذهبية (النسب الثابتة وإدارة المخاطر):**\n\n"
       "⚡ **1. صفقات السكالبينج:**\n"
       f"• **العملة:** XRP/USDT (سعر الدخول: `{xrp:,.4f}`)\n"
+      f"  🛑 *وقف الخسارة (SL):* `{xrp_sl:,.4f}` (-1.2%)\n"
       f"  🎯 *الهدف الأول (TP1):* `{xrp * 1.008:,.4f}` ──> **(+{xrp_tp1_pct}%)**\n"
-      f"  🛡️ **نقطة التأمين:** جني 50% ونقل وقف الخسارة لسعر الدخول"
+      f"  🛡️ **التأمين:** جني 50% ونقل وقف الخسارة لسعر الدخول"
       f" (`{xrp:,.4f}`).\n"
       f"  🚀 *الهدف الثاني (TP2):* `{xrp * 1.015:,.4f}` ──> **(+{xrp_tp2_pct}%)**\n\n"
       "📅 **2. الصفقات اليومية:**\n"
       f"• **العملة:** BTC/USDT (سعر الدخول: `{btc:,.2f}`)\n"
+      f"  🛑 *وقف الخسارة (SL):* `{btc_sl:,.2f}` (-1.2%)\n"
       f"  🎯 *الهدف الأول (TP1):* `{btc * 1.012:,.2f}` ──> **(+{btc_tp1_pct}%)**\n"
-      f"  🛡️ **نقطة التأمين:** جني نصف الربح وحرك وقف الخسارة لنقطة الدخول"
+      f"  🛡️ **التأمين:** جني نصف الربح وحرك وقف الخسارة لنقطة الدخول"
       f" (`{btc:,.2f}`).\n"
       f"  🚀 *الهدف الثاني (TP2):* `{btc * 1.025:,.2f}` ──> **(+{btc_tp2_pct}%)**\n\n"
       "🌊 **3. صفقات السوينغ:**\n"
       f"• **العملة:** ETH/USDT (سعر الدخول: `{eth:,.2f}`)\n"
+      f"  🛑 *وقف الخسارة (SL):* `{eth_sl:,.2f}` (-1.2%)\n"
       f"  🎯 *الهدف الأول (TP1):* `{eth * 1.03:,.2f}` ──> **(+{eth_tp1_pct}%)**\n"
-      f"  🛡️ **نقطة التأمين:** تأمين الصفقة عند الدخول (`{eth:,.2f}`).\n"
+      f"  🛡️ **التأمين:** تأمين الصفقة عند الدخول (`{eth:,.2f}`).\n"
       f"  🚀 *الهدف الثاني (TP2):* `{eth * 1.06:,.2f}` ──> **(+{eth_tp2_pct}%)**\n\n"
       "🏛️ **4. الاستثمار طويل الأمد (DCA + حماية الأصل):**\n"
       "• بيع **25% من الأرباح الصافية فقط** وتحويلها لـ USDT ككاش مع **الحفاظ"
@@ -451,17 +458,19 @@ def send_analytical_vision_deals(message):
       f"🪙 **1. بيتكوين (BTC/USDT):**\n"
       f"• السعر الحالي: `{btc_price:,.2f}$` (التغير 24س: `{btc_chg:+.2f}%`)\n"
       f"• الحالة: {btc_trend}\n"
+      f"  🛑 *SL:* `{btc_price * (1 - btc_sl_p):,.2f}`\n"
       f"  🎯 *TP1:* `{btc_price * (1 + btc_tp1_p):,.2f}` (+{btc_tp1_p*100}%)\n"
-      f"  🚀 *TP2:* `{btc_price * (1 + btc_tp2_p):,.2f}` (+{btc_tp2_p*100}%)\n"
-      f"  🛑 *SL:* `{btc_price * (1 - btc_sl_p):,.2f}`\n\n"
+      f"  🚀 *TP2:* `{btc_price * (1 + btc_tp2_p):,.2f}` (+{btc_tp2_p*100}%)\n\n"
       f"💎 **2. إيثريوم (ETH/USDT):**\n"
       f"• السعر الحالي: `{eth_price:,.2f}$` (التغير 24س: `{eth_chg:+.2f}%`)\n"
       f"• الحالة: {eth_trend}\n"
+      f"  🛑 *SL:* `{eth_price * (1 - eth_sl_p):,.2f}`\n"
       f"  🎯 *TP1:* `{eth_price * (1 + eth_tp1_p):,.2f}` (+{eth_tp1_p*100}%)\n"
       f"  🚀 *TP2:* `{eth_price * (1 + eth_tp2_p):,.2f}` (+{eth_tp2_p*100}%)\n\n"
       f"⚡ **3. ريبل (XRP/USDT):**\n"
       f"• السعر الحالي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
       f"• الحالة: {xrp_trend}\n"
+      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.4f}`\n"
       f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.4f}` (+{xrp_tp1_p*100}%)\n\n"
       "🛡️ **نظام التأمين:** يتم تفعيل Breakeven (نقل وقف الخسارة لسعر الدخول)"
       " فور بلوغ الهدف الأول تلقائياً."
@@ -469,7 +478,7 @@ def send_analytical_vision_deals(message):
   send_with_menu(message, deals_text)
 
 
-# --- 1. صفقات الذهب (القاعدة الذهبية - نسب ثابتة مع وقف خسارة محدد) ---
+# --- صفقات الذهب (القاعدة الذهبية) ---
 @bot.message_handler(
     func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)"
 )
@@ -477,7 +486,7 @@ def send_gold_golden_rule(message):
   current_gold = get_gold_price()
   tp1_price = current_gold * (1 + 0.007)
   tp2_price = current_gold * (1 + 0.015)
-  sl_price = current_gold * (1 - 0.01)  # وقف خسارة مقنن 1%
+  sl_price = current_gold * (1 - 0.01)
 
   gold_text = (
       "🟡 **توصيات صفقات الذهب (القاعدة الذهبية):**\n\n"
@@ -493,13 +502,12 @@ def send_gold_golden_rule(message):
   send_with_menu(message, gold_text)
 
 
-# --- 2. صفقات الذهب (الرؤية التحليلية - بناءً على الزخم الحي) ---
+# --- صفقات الذهب (الرؤية التحليلية) ---
 @bot.message_handler(
     func=lambda message: message.text == "🟡 صفقات الذهب (الرؤية التحليلية)"
 )
 def send_gold_analytical_vision(message):
   current_gold = get_gold_price()
-  # محاكاة تحليل زخم الذهب الحي
   tp1_price = current_gold * (1 + 0.01)
   tp2_price = current_gold * (1 + 0.022)
   sl_price = current_gold * (1 - 0.012)
