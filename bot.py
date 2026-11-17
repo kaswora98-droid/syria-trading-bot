@@ -343,7 +343,6 @@ def send_with_menu(message, text):
 def send_trading_deals_with_chart(message):
   btc, eth, xrp = get_crypto_prices()
 
-  # حساب النسبة للأهداف
   xrp_tp1_pct = calculate_profit_percentage(xrp, xrp * 1.008, "BUY")
   xrp_tp2_pct = calculate_profit_percentage(xrp, xrp * 1.015, "BUY")
   btc_tp1_pct = calculate_profit_percentage(btc, btc * 1.012, "BUY")
@@ -392,10 +391,10 @@ def send_gold_deals(message):
   gold_text = (
       "🟡 **توصيات صفقات الذهب (XAUUSD) + نظام التأمين:**\n\n"
       "⚡ **1️⃣ صفقات الذهب اليومية:**\n"
-      "• **الهدف الأول (TP1):** صعود (+0.7%) ──> **(+0.7%)**\n"
-      "• **🛡️ التأمين:** فور تحقق (+0.7%)، أغلق 50% وانقل وقف الخسارة لسعر"
-      " الدخول.\n"
-      "• **الهدف الثاني (TP2):** صعود (+1.5%) ──> **(+1.5%)**\n\n"
+      "• **الهدف الأول (TP1):** صعود بمقدار **(+0.7%)**\n"
+      "• **🛡️ التأمين:** فور تحقق الهدف الأول، أغلق 50% من العقد وانقل وقف"
+      " الخسارة لسعر الدخول.\n"
+      "• **الهدف الثاني (TP2):** صعود بمقدار **(+1.5%)**\n\n"
       "📈 **2️⃣ استثمار وتجميع الذهب:** بدون رافعة مالية مع حماية الأصل الأساسي."
   )
   send_with_menu(message, gold_text)
