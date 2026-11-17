@@ -34,7 +34,7 @@ active_quizzes = {}
 app = Flask(__name__)
 
 
-# --- دوال حفظ واسترجاع البيانات مع ضمان الثبات ---
+# --- دوال حفظ واسترجاع البيانات مع الحماية الجذرية ---
 def load_users():
   if os.path.exists(DATA_FILE):
     try:
@@ -93,7 +93,7 @@ def run_flask():
   app.run(host="0.0.0.0", port=port)
 
 
-# جلب الأسعار الحية
+# جلب الأسعار الحية للعملات
 def get_crypto_prices():
   try:
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple&vs_currencies=usd"
@@ -111,6 +111,22 @@ def get_crypto_prices():
       1815.0 + random.randint(-8, 8),
       0.5200 + (random.randint(-2, 2) / 1000.0),
   )
+
+
+# جلب سعر الذهب الحي (XAUUSD)
+def get_gold_price():
+  try:
+    response = requests.get(
+        "https://data-asg.goldprice.org/dbXRates/USD", timeout=5
+    )
+    if response.status_code == 200:
+      data = response.json()
+      for item in data.get("items", []):
+        if item.get("curr") == "USD":
+          return float(item.get("xauPrice", 2650.0))
+  except Exception:
+    pass
+  return 2650.0
 
 
 # مولد الرسوم البيانية
@@ -259,7 +275,6 @@ def send_welcome(message):
     except Exception:
       pass
 
-  # إغلاق ثغرة التجربة (التحقق هل المستخدم مسجل مسبقاً)
   if uid_str not in all_users:
     expiry_date = datetime.now() + timedelta(days=3)
     user_name = message.from_user.first_name or "بدون اسم"
@@ -390,13 +405,18 @@ def send_trading_deals_with_chart(message):
     func=lambda message: message.text == "🟡 صفقات الذهب اليومية والاستثمارية"
 )
 def send_gold_deals(message):
+  current_gold = get_gold_price()
+  tp1_price = current_gold * (1 + 0.007)
+  tp2_price = current_gold * (1 + 0.015)
+
   gold_text = (
-      "🟡 **توصيات صفقات الذهب (XAUUSD) + نظام التأمين:**\n\n"
+      "🟡 **توصيات صفقات الذهب (XAUUSD) الحية + نظام التأمين:**\n\n"
+      f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n\n"
       "⚡ **1️⃣ صفقات الذهب اليومية:**\n"
-      "• **الهدف الأول (TP1):** صعود بمقدار **(+0.7%)**\n"
-      "• **🛡️ التأمين:** فور تحقق الهدف الأول، أغلق 50% من العقد وانقل وقف"
-      " الخسارة لسعر الدخول.\n"
-      "• **الهدف الثاني (TP2):** صعود بمقدار **(+1.5%)**\n\n"
+      f"• **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ ──> **(+0.7%)**\n"
+      f"  • 🛡️ **التأمين:** فور تحقق الهدف الأول، أغلق 50% من العقد وانقل وقف"
+      f" الخسارة لسعر الدخول (`{current_gold:,.2f}`).\n"
+      f"• **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ ──> **(+1.5%)**\n\n"
       "📈 **2️⃣ استثمار وتجميع الذهب:** بدون رافعة مالية مع حماية الأصل الأساسي."
   )
   send_with_menu(message, gold_text)
