@@ -113,7 +113,7 @@ def get_crypto_prices():
   )
 
 
-# جلب سعر الذهب الحي (XAUUSD)
+# جلب سعر الذهب الحي (XAUUSD) المحدث
 def get_gold_price():
   try:
     response = requests.get(
@@ -123,10 +123,10 @@ def get_gold_price():
       data = response.json()
       for item in data.get("items", []):
         if item.get("curr") == "USD":
-          return float(item.get("xauPrice", 2650.0))
+          return float(item.get("xauPrice", 3840.28))
   except Exception:
     pass
-  return 2650.0
+  return 3840.28
 
 
 # مولد الرسوم البيانية
