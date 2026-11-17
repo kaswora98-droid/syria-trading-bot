@@ -5,8 +5,9 @@ import random
 import telebot
 from telebot import types
 
-# إعدادات البوت والتوكن الكامل الصحيح
-TOKEN = "8928709566:AAH3k_EXAMPLE_FULL_TOKEN_HERE"  # ضع التوكن الكامل الخاص ببوتك هنا
+# طريقة احترافية وآمنة: يسحب التوكن من إعدادات Render أو يمكنك وضعه هنا مباشرة بالكامل
+# مثال: TOKEN = "8928709566:ABCdefGhIJKlmNoPQRsTUVwxyZ..."
+TOKEN = os.environ.get("BOT_TOKEN", "8928709566:ضع_التوكن_الكامل_هنا_بدون_فراغات")
 bot = telebot.TeleBot(TOKEN)
 
 ADMIN_ID = 8611033531
@@ -152,7 +153,7 @@ def handle_text_messages(message):
 
   if text == "📊 الصفقات المقترحة":
     sample_signal = format_trade_signal(
-        "BTC/USDT", 64200, 66500, 68800, 62800, "BUY", "تحليلي فني لعملات السبوت"
+        "BTC/USDT", 64200, 66500, 68800, 62800, "BUY", "تحليلي فني للسبوت"
     )
     bot.send_message(message.chat.id, sample_signal, parse_mode="Markdown")
 
