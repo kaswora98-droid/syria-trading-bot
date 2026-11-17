@@ -62,7 +62,6 @@ def handle_start(message):
   user_id = str(message.from_user.id)
   users = load_data(USERS_FILE)
 
-  # التحقق مما إذا كان المستخدم مسجلاً مسبقاً (حتى لو مسح المحادثة أو انتهى اشتراكه)
   if user_id in users:
     bot.send_message(
         message.chat.id,
@@ -71,7 +70,6 @@ def handle_start(message):
     )
     return
 
-  # مستخدم جديد كلياً لأول مرة
   trial_days = 3
   expiry_date = (
       datetime.datetime.now() + datetime.timedelta(days=trial_days)
@@ -86,7 +84,6 @@ def handle_start(message):
   }
   save_data(USERS_FILE, users)
 
-  # إرسال تنبيه فوري للمطور
   try:
     bot.send_message(
         ADMIN_ID,
@@ -208,6 +205,12 @@ if __name__ == "__main__":
   flask_thread.start()
   print("Flask web server started successfully...")
 
+  # حل مشكلة التعارض: حذف أي Webhook قديم فورا قبل تشغيل الـ Polling
+  try:
+    bot.remove_webhook()
+    print("Webhook removed successfully. Starting polling...")
+  except Exception as e:
+    print(f"Error removing webhook: {e}")
+
   # تشغيل بوت تيليجرام
-  print("Telegram Bot is running securely...")
   bot.infinity_polling()
