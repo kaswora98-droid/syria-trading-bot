@@ -5,8 +5,8 @@ import random
 import telebot
 from telebot import types
 
-# إعدادات البوت والتوكن
-TOKEN = "8928709566:"  # أكمل التوكن الخاص بك هنا إن لم يكن كاملاً
+# إعدادات البوت والتوكن الكامل الصحيح
+TOKEN = "8928709566:AAH3k_EXAMPLE_FULL_TOKEN_HERE"  # ضع التوكن الكامل الخاص ببوتك هنا
 bot = telebot.TeleBot(TOKEN)
 
 ADMIN_ID = 8611033531
@@ -52,7 +52,6 @@ def handle_start(message):
 
   # التحقق مما إذا كان المستخدم مسجلاً مسبقاً (حتى لو انتهى اشتراكه أو مسح المحادثة)
   if user_id in users:
-    # مستخدم قديم: ممنوع منعا باتا منحه فترة تجريبية جديدة!
     bot.send_message(
         message.chat.id,
         "أهلاً بك مجدداً يا مهندس! حسابك مسجل مسبقاً في النظام.",
@@ -71,7 +70,7 @@ def handle_start(message):
       "first_name": message.from_user.first_name or "User",
       "joined_date": datetime.datetime.now().isoformat(),
       "expiry_date": expiry_date,
-      "is_trial_used": True,  # علامة تثبت أنه استهلك التجربة لمرة واحدة وللأبد
+      "is_trial_used": True,
   }
   save_data(USERS_FILE, users)
 
@@ -138,9 +137,7 @@ def admin_users_list(message):
     return
   users = load_data(USERS_FILE)
   text = f"👥 **إجمالي المشتركين:** {len(users)}\n\n"
-  for uid, info in list(users.items())[
-      -15:
-  ]:  # يعرض آخر 15 مشتركاً للتنظيم
+  for uid, info in list(users.items())[-15:]:
     text += (
         f"• {info.get('first_name')} (`{uid}`) - ينتهي: {info.get('expiry_date')[:10]}\n"
     )
