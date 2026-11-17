@@ -34,12 +34,15 @@ active_quizzes = {}
 app = Flask(__name__)
 
 
-# --- دوال حفظ واسترجاع البيانات ---
+# --- دوال حفظ واسترجاع البيانات مع ضمان الثبات ---
 def load_users():
   if os.path.exists(DATA_FILE):
     try:
       with open(DATA_FILE, "r", encoding="utf-8") as f:
-        return json.load(f)
+        content = f.read()
+        if not content.strip():
+          return {}
+        return json.loads(content)
     except Exception:
       return {}
   return {}
@@ -49,8 +52,8 @@ def save_users(data):
   try:
     with open(DATA_FILE, "w", encoding="utf-8") as f:
       json.dump(data, f, ensure_ascii=False, indent=4)
-  except Exception:
-    pass
+  except Exception as e:
+    print(f"Error saving users: {e}")
 
 
 def load_groups():
