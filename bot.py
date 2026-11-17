@@ -6,13 +6,13 @@ from flask import Flask
 import telebot
 from telebot import types
 
-# إعداد خادم الويب لإرضاء منصة Render وبورت الاستماع
+# إعداد خادم الويب لإرضاء منصة Render وفتح بورت الاستماع
 app = Flask(__name__)
 
 
 @app.route("/")
 def home():
-  return "Syria Trading Bot is running 24/7!"
+  return "Syria Trading Bot is running 24/7 successfully!"
 
 
 def run_flask():
@@ -20,8 +20,8 @@ def run_flask():
   app.run(host="0.0.0.0", port=port)
 
 
-# --- ضع التوكن الحقيقي الكامل الخاص بك هنا مباشرة ---
-TOKEN = "8928709566:AAGh_YOUR_FULL_TOKEN_HERE"  # استبدل هذا السطر بالكامل بتوكنك الصحيح من BotFather
+# --- التوكن الحقيقي الصحيح الخاص ببوتك ---
+TOKEN = "8928709566:AAE8G20dfLOqdo7GXJ9APGPqH7OTdyq5leg"
 bot = telebot.TeleBot(TOKEN)
 
 ADMIN_ID = 8611033531
