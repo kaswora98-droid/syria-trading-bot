@@ -1,19 +1,18 @@
 import datetime
 import json
 import os
-import random
 from threading import Thread
+from flask import Flask
 import telebot
 from telebot import types
-from flask import Flask
 
-# إعداد خادم الويب البسيط لإرضاء متطلبات البورت في منصة Render
+# إعداد خادم الويب لإرضاء منصة Render وبورت الاستماع
 app = Flask(__name__)
 
 
 @app.route("/")
 def home():
-  return "Syria Trading Bot is running successfully 24/7!"
+  return "Syria Trading Bot is running 24/7!"
 
 
 def run_flask():
@@ -21,18 +20,14 @@ def run_flask():
   app.run(host="0.0.0.0", port=port)
 
 
-# --- إعدادات البوت والتوكن ---
-TOKEN = os.environ.get(
-    "BOT_TOKEN", "8928709566:ضع_التوكن_الكامل_هنا_بدون_فراغات"
-)
+# --- ضع التوكن الحقيقي الكامل الخاص بك هنا مباشرة ---
+TOKEN = "8928709566:AAGh_YOUR_FULL_TOKEN_HERE"  # استبدل هذا السطر بالكامل بتوكنك الصحيح من BotFather
 bot = telebot.TeleBot(TOKEN)
 
 ADMIN_ID = 8611033531
 USERS_FILE = "users_data.json"
-GROUPS_FILE = "groups_data.json"
 
 
-# --- دوال إدارة البيانات وحفظها ---
 def load_data(filename):
   if not os.path.exists(filename):
     return {}
@@ -48,7 +43,6 @@ def save_data(filename, data):
     json.dump(data, f, ensure_ascii=False, indent=4)
 
 
-# --- دالة حساب نسبة الربح المئوية للصفقة ---
 def calculate_profit_percentage(entry_price, target_price, direction="BUY"):
   try:
     entry = float(entry_price)
@@ -68,7 +62,7 @@ def handle_start(message):
   user_id = str(message.from_user.id)
   users = load_data(USERS_FILE)
 
-  # التحقق مما إذا كان المستخدم مسجلاً مسبقاً (حتى لو انتهى اشتراكه أو مسح المحادثة)
+  # التحقق مما إذا كان المستخدم مسجلاً مسبقاً (حتى لو مسح المحادثة أو انتهى اشتراكه)
   if user_id in users:
     bot.send_message(
         message.chat.id,
@@ -77,7 +71,7 @@ def handle_start(message):
     )
     return
 
-  # مستخدم جديد كلياً لأول مرة في تاريخ البوت
+  # مستخدم جديد كلياً لأول مرة
   trial_days = 3
   expiry_date = (
       datetime.datetime.now() + datetime.timedelta(days=trial_days)
@@ -92,7 +86,7 @@ def handle_start(message):
   }
   save_data(USERS_FILE, users)
 
-  # إرسال تنبيه فوري للمطور (أنت)
+  # إرسال تنبيه فوري للمطور
   try:
     bot.send_message(
         ADMIN_ID,
@@ -102,7 +96,6 @@ def handle_start(message):
   except:
     pass
 
-  # ترحيب بالمشترك الجديد
   bot.send_message(
       message.chat.id,
       "🎉 أهلاً بك في **بوت التداول الذكي والشامل** (`SyriaTradingBot`)!\n\n"
@@ -113,7 +106,6 @@ def handle_start(message):
   )
 
 
-# --- القائمة الرئيسية ---
 def get_main_menu():
   markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
   btn1 = types.KeyboardButton("📊 الصفقات المقترحة")
@@ -126,7 +118,6 @@ def get_main_menu():
   return markup
 
 
-# --- نموذج إرسال صفقة مقترحة مع نسب الأهداف المئوية ---
 def format_trade_signal(
     coin, entry, tp1, tp2, sl, direction="BUY", notes="توصية سبوت آمنة"
 ):
@@ -148,7 +139,6 @@ def format_trade_signal(
   return signal_text
 
 
-# --- لوحة تحكم المطور (الإحصائيات والمشتركين) ---
 @bot.message_handler(commands=["users"])
 def admin_users_list(message):
   if message.from_user.id != ADMIN_ID:
@@ -156,13 +146,10 @@ def admin_users_list(message):
   users = load_data(USERS_FILE)
   text = f"👥 **إجمالي المشتركين:** {len(users)}\n\n"
   for uid, info in list(users.items())[-15:]:
-    text += (
-        f"• {info.get('first_name')} (`{uid}`) - ينتهي: {info.get('expiry_date')[:10]}\n"
-    )
+    text += f"• {info.get('first_name')} (`{uid}`) - ينتهي: {info.get('expiry_date')[:10]}\n"
   bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
 
-# --- معالجة الأزرار النصية ---
 @bot.message_handler(func=lambda message: True)
 def handle_text_messages(message):
   text = message.text
@@ -214,13 +201,12 @@ def handle_text_messages(message):
     )
 
 
-# --- نقطة التشغيل الرئيسية (تشغيل خادم الويب والبوت معاً) ---
 if __name__ == "__main__":
-  # تشغيل خادم Flask في خلفية النظام لفتح البورت المطلوب لمنصة Render
+  # تشغيل خادم Flask لإرضاء منصة Render وفتح البورت
   flask_thread = Thread(target=run_flask)
   flask_thread.daemon = True
   flask_thread.start()
-  print("Flask web server started on port 10000...")
+  print("Flask web server started successfully...")
 
   # تشغيل بوت تيليجرام
   print("Telegram Bot is running securely...")
