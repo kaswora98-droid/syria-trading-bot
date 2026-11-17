@@ -813,14 +813,75 @@ def check_my_status_and_ref(message):
   )
 
 
-# --- 13. لوحة تحكم المطور ---
+# --- 13. لوحة تحكم المطور المطورة ---
 @bot.message_handler(func=lambda message: message.text == "🛠️ لوحة تحكم المطور")
 def admin_panel(message):
   if message.from_user.id != ADMIN_ID:
     return
   bot.send_message(
       message.chat.id,
-      "👑 **لوحة تحكم المطور:**\n\nأوامر التحكم المتاحة:\n`/add_days ID days` (لتمديد اشتراك مستخدم)\n`/expire ID` (لإنهاء اشتراك مستخدم)\n`/stats` (لعرض إحصائيات البوت)\n`/ban ID` (لحظر مستخدم)\n`/unban ID` (لفك الحظر)",
+      "👑 **لوحة تحكم المطور:**\n\n"
+      "أوامر التحكم المتاحة:\n"
+      "• `/users` (لعرض قائمة بأسماء وتفاصيل جميع المشتركين)\n"
+      "• `/stats` (لعرض إحصائيات سريعة بالأعداد)\n"
+      "• `/add_days ID days` (لتمديد اشتراك مستخدم)\n"
+      "• `/expire ID` (لإنهاء اشتراك مستخدم)\n"
+      "• `/ban ID` (لحظر مستخدم)\n"
+      "• `/unban ID` (لفك الحظر)",
+      parse_mode="Markdown",
+  )
+
+
+@bot.message_handler(commands=["users"])
+def show_all_users(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+
+  if not all_users:
+    bot.send_message(
+        message.chat.id,
+        "📭 لا يوجد أي مشتركين مسجلين في قاعدة البيانات حتى الآن.",
+    )
+    return
+
+  users_list_text = "👥 **قائمة المشتركين في البوت:**\n\n"
+  counter = 1
+
+  for uid_str, u_data in all_users.items():
+    name = u_data.get("name", "بدون اسم")
+    uname = u_data.get("username", "لا يوجد")
+    expiry = u_data.get("expiry", "غير معروف")
+    ref_count = u_data.get("referral_count", 0)
+
+    try:
+      exp_formatted = datetime.fromisoformat(expiry).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+      exp_formatted = expiry
+
+    users_list_text += (
+        f"{counter}️⃣ **الاسم:** {name}\n"
+        f"   • المعرف (ID): `{uid_str}`\n"
+        f"   • اليوزر: `@{uname}`\n"
+        f"   • ينتهي في: `{exp_formatted}`\n"
+        f"   • الدعوات: **{ref_count}**\n\n"
+    )
+    counter += 1
+
+    if len(users_list_text) > 3500:
+      bot.send_message(message.chat.id, users_list_text, parse_mode="Markdown")
+      users_list_text = ""
+
+  if users_list_text:
+    bot.send_message(message.chat.id, users_list_text, parse_mode="Markdown")
+
+
+@bot.message_handler(commands=["stats"])
+def show_stats(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  bot.send_message(
+      message.chat.id,
+      f"📊 **إحصائيات البوت:**\n• إجمالي المشتركين: {len(all_users)}\n• المجموعات المفعلة: {len(active_groups)}\n\n💡 *ملاحظة:* استخدم الأمر `/users` لعرض أسماء وتفاصيل جميع المشتركين بالكامل.",
       parse_mode="Markdown",
   )
 
@@ -870,17 +931,6 @@ def expire_subscription(message):
       bot.send_message(message.chat.id, f"🔒 تم إنهاء اشتراك المستخدم `{target_id}`.")
   except Exception:
     bot.send_message(message.chat.id, "⚠️ خطأ في الصيغة. استخدم: `/expire ID`")
-
-
-@bot.message_handler(commands=["stats"])
-def show_stats(message):
-  if message.from_user.id != ADMIN_ID:
-    return
-  bot.send_message(
-      message.chat.id,
-      f"📊 **إحصائيات البوت:**\n• إجمالي المشتركين: {len(all_users)}\n• المجموعات المفعلة: {len(active_groups)}",
-      parse_mode="Markdown",
-  )
 
 
 @bot.message_handler(commands=["ban"])
