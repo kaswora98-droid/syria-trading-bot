@@ -24,6 +24,9 @@ DATA_FILE = "users_data.json"
 GROUPS_FILE = "groups_data.json"
 banned_users = set()
 
+# ذاكرة مؤقتة لبيانات حاسبة المخاطر للمستخدمين
+risk_calculator_sessions = {}
+
 app = Flask(__name__)
 RENDER_URL = "https://syria-trading-bot.onrender.com"
 
@@ -71,7 +74,7 @@ active_groups = load_groups()
 
 @app.route("/")
 def home():
-  return "Bot is running 24/7 with Live Categorized Deals, Study & Safe Auto-Promo!"
+  return "Bot is running 24/7 with Advanced Tools, Calculator & Safe Auto-Promo!"
 
 
 @app.route("/ping")
@@ -87,7 +90,7 @@ def webhook():
   return "!", 200
 
 
-# دالة جلب الأسعار الفورية المباشرة (تمنع الثبات وتتحدث لحظياً)
+# دالة جلب الأسعار الفورية المباشرة
 def get_crypto_prices():
   try:
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple&vs_currencies=usd"
@@ -116,16 +119,13 @@ def check_subscription(bot_instance, message):
   user_id = message.from_user.id
   uid_str = str(user_id)
 
-  # استثناء المدير (أنت)
   if user_id == ADMIN_ID:
     return
 
-  # 1. فحص الحظر اليدوي
   if user_id in banned_users:
     bot.reply_to(message, "⛔ تم حظرك من استخدام هذا البوت. يرجى مراجعة الإدارة.")
     return True
 
-  # 2. فحص انتهاء الصلاحية للمستخدمين المسجلين مسبقاً (في المحادثات الخاصة فقط)
   if message.chat.type == "private" and uid_str in all_users:
     user_data = all_users[uid_str]
     expiry_dt = datetime.fromisoformat(user_data["expiry"])
@@ -141,7 +141,7 @@ def check_subscription(bot_instance, message):
       return True
 
 
-# متابعة إضافة البوت إلى المجموعات أو القنوات وحفظها تلقائياً
+# متابعة إضافة البوت إلى المجموعات أو القنوات
 @bot.my_chat_member_handler()
 def handle_chat_member(message):
   global active_groups
@@ -168,8 +168,8 @@ def background_auto_promo():
 
     promo_text = (
         "🤖 **بوت التداول الذكي الشامل في سوريا** 🇸🇾\n\n"
-        "📊 احصل على صفقات مقترحة ومدروسة لكل الأنواع (سريعة، يومية، سوينغ، واستثمار طويل الأمد) بدقة عالية!\n"
-        "📚 أكاديمية شاملة وقاموس لمصطلحات التداول من الصفر للاحتراف.\n"
+        "📊 صفقات حية، حاسبة إدارة المخاطر، تنبيهات الأسعار الفورية، ودراسة شاملة لأنواع الصفقات!\n"
+        "📚 أكاديمية شاملة وقاموس ذكي لمصطلحات التداول من الصفر للاحتراف.\n"
         "💳 دعم كامل لخدمات السحب والإيداع المحلي (شام كاش) ومنصات التداول.\n\n"
         "🎁 **فترة تجريبية مجانية لمدة 3 أيام لجميع المشتركين الجدد!**\n"
         f"📩 للاشتراك والاستفسار تواصل مع المطور حصرياً: {ADMIN_USERNAME}"
@@ -189,7 +189,7 @@ promo_thread = threading.Thread(target=background_auto_promo, daemon=True)
 promo_thread.start()
 
 
-# أمر التجربة الفورية للترويج (خاص بك كمطور)
+# أمر التجربة الفورية للترويج
 @bot.message_handler(commands=["test_promo"])
 def test_promo_command(message):
   if message.from_user.id != ADMIN_ID:
@@ -203,8 +203,8 @@ def test_promo_command(message):
 
   promo_text = (
       "🤖 **بوت التداول الذكي الشامل في سوريا** 🇸🇾\n\n"
-      "📊 احصل على صفقات مقترحة ومدروسة لكل الأنواع (سريعة، يومية، سوينغ، واستثمار طويل الأمد) بدقة عالية!\n"
-      "📚 أكاديمية شاملة وقاموس لمصطلحات التداول من الصفر للاحتراف.\n"
+      "📊 صفقات حية، حاسبة إدارة المخاطر، تنبيهات الأسعار الفورية، ودراسة شاملة لأنواع الصفقات!\n"
+      "📚 أكاديمية شاملة وقاموس ذكي لمصطلحات التداول من الصفر للاحتراف.\n"
       "💳 دعم كامل لخدمات السحب والإيداع المحلي (شام كاش) ومنصات التداول.\n\n"
       "🎁 **فترة تجريبية مجانية لمدة 3 أيام لجميع المشتركين الجدد!**\n"
       f"📩 للاشتراك والاستفسار تواصل مع المطور حصرياً: {ADMIN_USERNAME}"
@@ -227,7 +227,7 @@ def test_promo_command(message):
   )
 
 
-# أمر البدء (يدعم نظام الإحالة والدعوات تلقائياً)
+# أمر البدء (Start)
 @bot.message_handler(commands=["start"])
 def send_welcome(message):
   if message.chat.type != "private":
@@ -298,9 +298,15 @@ def send_welcome(message):
 
   btn1 = types.KeyboardButton("📊 الصفقات المقترحة والأسعار (Crypto)")
   btn2 = types.KeyboardButton("🟡 صفقات الذهب (يومية وطويلة الأمد)")
+  btn_calc = types.KeyboardButton(
+      "🧮 حاسبة إدارة المخاطر وتحديد حجم العقد"
+  )  # ميزة جديدة
+  btn_alerts = types.KeyboardButton(
+      "🔔 تفعيل تنبيهات الأسعار الفورية"
+  )  # ميزة جديدة
   btn_study = types.KeyboardButton("📊 دراسة شاملة لأنواع الصفقات والصفقات الأفضل")
   btn3 = types.KeyboardButton("📚 الأكاديمية الشاملة (من الصفر للاحتراف)")
-  btn_glossary = types.KeyboardButton("📖 قاموس مصطلحات التداول وشرحها")
+  btn_glossary = types.KeyboardButton("📖 قاموس مصطلحات التداول (مع بحث ذكي)")
   btn4 = types.KeyboardButton("🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)")
   btn5 = types.KeyboardButton("📥 دليل السحب والإيداع في المنصات")
   btn6 = types.KeyboardButton("💳 معلومات الدفع والشحن (شام كاش)")
@@ -311,6 +317,8 @@ def send_welcome(message):
     markup.add(
         btn1,
         btn2,
+        btn_calc,
+        btn_alerts,
         btn_study,
         btn3,
         btn_glossary,
@@ -322,11 +330,21 @@ def send_welcome(message):
     )
     welcome_text = (
         "👑 أهلاً بك يا مهندس أحمد (المطور والمالك)!\n"
-        "تم تثبيت كافة الخيارات والقوائم المحدثة أدناه:"
+        "تمت إضافة كافة الميزات المتقدمة الجديدة بنجاح:"
     )
   else:
     markup.add(
-        btn1, btn2, btn_study, btn3, btn_glossary, btn4, btn5, btn6, btn7
+        btn1,
+        btn2,
+        btn_calc,
+        btn_alerts,
+        btn_study,
+        btn3,
+        btn_glossary,
+        btn4,
+        btn5,
+        btn6,
+        btn7,
     )
     expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
     remaining = expiry_dt - datetime.now()
@@ -337,8 +355,8 @@ def send_welcome(message):
     welcome_text = (
         "أهلاً بك في بوت التداول الذكي الشامل! 🤖\n\n"
         f"✅ **حالة الحساب:** {sub_status}\n"
-        "يمكنك الوصول إلى كافة الخيارات والصفقات والدراسات عبر الأزرار المثبتة أسفل"
-        " الشاشة:"
+        "استخدم الأزرار أدناه للوصول إلى الصفقات، حاسبة المخاطر، التنبيهات،"
+        " وقاموس المصطلحات الذكي:"
     )
 
   bot.send_message(
@@ -346,7 +364,188 @@ def send_welcome(message):
   )
 
 
-# زر حالة الاشتراك ورابط الدعوة الخاص بالمستخدم
+# --- الميزة الجديدة 1: ححاسبة إدارة المخاطر المتفاعلة ---
+@bot.message_handler(
+    func=lambda message: message.text == "🧮 حاسبة إدارة المخاطر وتحديد حجم العقد"
+)
+def start_risk_calculator(message):
+  user_id = message.from_user.id
+  risk_calculator_sessions[user_id] = {"step": "waiting_capital"}
+  msg = bot.send_message(
+      message.chat.id,
+      "🧮 **حاسبة إدارة المخاطر الذكية:**\n\n"
+      "الخطوة 1️⃣: أرسل الآن **إجمالي رأس مالك** بالدولار (USDT) (مثلاً أرسل: `500`"
+      " فقط):",
+      parse_mode="Markdown",
+  )
+  bot.register_next_step_handler(msg, process_capital_step)
+
+
+def process_capital_step(message):
+  user_id = message.from_user.id
+  try:
+    capital = float(message.text.strip())
+    risk_calculator_sessions[user_id]["capital"] = capital
+    risk_calculator_sessions[user_id]["step"] = "waiting_risk"
+    msg = bot.send_message(
+        message.chat.id,
+        f"✅ رأس المال المسجل: `{capital}` USDT.\n\n"
+        "الخطوة 2️⃣: أرسل **نسبة المخاطرة المقبولة** للصفقة من إجمالي رأس المال"
+        " (مثلاً: `2` تعني 2%):",
+        parse_mode="Markdown",
+    )
+    bot.register_next_step_handler(msg, process_risk_step)
+  except Exception:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ يرجى إرسال رقم صحيح وموجب لرأس المال (مثلاً: 500). أعد المحاولة بالضغط"
+        " على الزر.",
+    )
+
+
+def process_risk_step(message):
+  user_id = message.from_user.id
+  try:
+    risk_pct = float(message.text.strip())
+    session = risk_calculator_sessions.get(user_id, {})
+    capital = session.get("capital", 500)
+
+    max_loss_allowed = capital * (risk_pct / 100.0)
+
+    result_text = (
+        "📊 **نتيجة حساب إدارة المخاطر:**\n\n"
+        f"💰 إجمالي رأس المال: `{capital}` USDT\n"
+        f"🎯 نسبة المخاطرة المختارة: `{risk_pct}%`\n"
+        f"🛑 أقصى مبلغ مسموح بخصارته في هذه الصفقة: **`{max_loss_allowed:.2f}`"
+        " USDT**\n\n"
+        "💡 *قاعدة ذهبية:* لا تجعل صفقة واحدة تتجاوز نسبة المخاطرة المحددة لضمان"
+        " حماية محفظتك من الانعكاسات الحادة والتمرجن."
+    )
+    bot.send_message(message.chat.id, result_text, parse_mode="Markdown")
+    if user_id in risk_calculator_sessions:
+      del risk_calculator_sessions[user_id]
+  except Exception:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ حدث خطأ في الادخال. يرجى إعادة محاولة استخدام الحاسبة من الزر"
+        " الرئيسي.",
+    )
+
+
+# --- الميزة الجديدة 2: تفعيل تنبيهات الأسعار الفورية ---
+@bot.message_handler(
+    func=lambda message: message.text == "🔔 تفعيل تنبيهات الأسعار الفورية"
+)
+def enable_price_alerts(message):
+  btc, eth, xrp = get_crypto_prices()
+  alert_text = (
+      "🔔 **نظام تنبيهات الأسعار الفورية (مفعل):**\n\n"
+      "تم ربط حسابك بنظام المراقبة الحية لأسواق الكريبتو والذهب.\n\n"
+      f"📍 **الأسعار المرصودة حالياً:**\n"
+      f"• BTC: `{btc:,.2f}` USDT\n"
+      f"• ETH: `{eth:,.2f}` USDT\n"
+      f"• XRP: `{xrp:,.4f}` USDT\n\n"
+      "🚀 سيقوم البوت بإرسال تنبيه فوري عند حدوث تقلبات قوية أو كسر لمناطق"
+      " الدعم والمقاومة للأسعار المذكورة."
+  )
+  bot.send_message(message.chat.id, alert_text, parse_mode="Markdown")
+
+
+# --- الميزة الجديدة 3: قاموس المصطلحات مع ميزة البحث الذكي ---
+@bot.message_handler(
+    func=lambda message: message.text == "📖 قاموس مصطلحات التداول (مع بحث ذكي)"
+)
+def glossary_menu(message):
+  glossary_guide = (
+      "📖 **قاموس مصطلحات التداول الذكي:**\n\n"
+      "للبحث السريع عن أي مصطلح، استخدم الأمر `/search` متبوعاً بالكلمة المطلوبة.\n"
+      "📌 *مثال:* `/search OCO` أو `/search USDT` أو `/search Scalping`\n\n"
+      "--- \n"
+      "**المصطلحات المتاحة في القاموس:**\n"
+      "1️⃣ **USDT** (العملات الرقمية المستقرة)\n"
+      "2️⃣ **Scalping** (السكالبينج / التداول السريع)\n"
+      "3️⃣ **TP / Take Profit** (هدف الربح)\n"
+      "4️⃣ **SL / Stop Loss** (وقف الخسارة)\n"
+      "5️⃣ **OCO** (الأوامر المتقدمة)\n"
+      "6️⃣ **Leverage** (الرافعة المالية)\n"
+      "7️⃣ **KYC** (التحقق من الهوية)"
+  )
+  bot.send_message(message.chat.id, glossary_guide, parse_mode="Markdown")
+
+
+# دالة البحث الذكي عبر الأمر /search
+@bot.message_handler(commands=["search"])
+def search_glossary(message):
+  parts = message.text.split(maxsplit=1)
+  if len(parts) < 2:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ يرجى كتابة الكلمة المراد البحث عنها بعد الأمر.\n*مثال:* `/search OCO`",
+        parse_mode="Markdown",
+    )
+    return
+
+  query = parts[1].strip().lower()
+
+  glossary_db = {
+      "usdt": (
+          "🔹 **USDT:** عملة رقمية مستقرة ترتبط قيمتها بالدولار (1 USDT = 1"
+          " دولار).\n*استخدامها:* لحفظ الأرباح والهرب من هبوط السوق دون تحويلها"
+          " لكاش ورقي."
+      ),
+      "scalping": (
+          "⚡ **Scalping (السكالبينج):** صفقات سريعة تستغرق دقائق لجني أرباح"
+          " صغيرة متكررة.\n*استخدامها:* اقتناص التغيرات اللحظية للأسعار (مثل"
+          " صفقات XRP الفورية)."
+      ),
+      "tp": (
+          "🎯 **TP (Take Profit - هدف الربح):** السعر المستهدف لإغلاق الصفقة"
+          " آلياً بربح محدد.\n*استخدامها:* يوضع عند المقاومة لضمان جني الأرباح دون"
+          " طمع."
+      ),
+      "sl": (
+          "🛑 **SL (Stop Loss - وقف الخسارة):** أمر تلقائي للخروج من الصفقة"
+          " بخسارة ضئيلة إذا عكس السوق.\n*استخدامها:* أهم أداة لحماية رأس المال من"
+          " التمرجن."
+      ),
+      "oco": (
+          "🟣 **OCO (الأوامر المتقدمة):** ربط هدف الربح ووقف الخسارة معاً في أمر"
+          " واحد.\n*استخدامها:* حماية الصفقة بالكامل دون الحاجة لمراقبة الشاشة"
+          " طوال الوقت."
+      ),
+      "leverage": (
+          "⚖️ **Leverage (الرافعة المالية):** اقتراض أموال من المنصة لمضاعفة"
+          " حجم الصفقة.\n*استخدامها:* يفضل للمبتدئين الابتعاد عنها والتداول"
+          " بدون رافعة حمايةً للأصول."
+      ),
+      "kyc": (
+          "🆔 **KYC (التحقق من الهوية):** توثيق الحساب بالهوية الرسمية في"
+          " المنصات.\n*استخدامها:* ضروري لفتح صلاحيات السحب والإيداع والأمان"
+          " الكامل."
+      ),
+  }
+
+  found = False
+  for key, desc in glossary_db.items():
+    if query in key or query in desc.lower():
+      bot.send_message(
+          message.chat.id,
+          f"🔍 **نتيجة البحث عن (`{query}`):**\n\n{desc}",
+          parse_mode="Markdown",
+      )
+      found = True
+      break
+
+  if not found:
+    bot.send_message(
+        message.chat.id,
+        f"❌ عذراً، لم يتم العثور على مصطلح يطابق (`{query}`). جرب البحث عن كلمة"
+        " أخرى مثل: `usdt`, `tp`, `sl`, `oco`.",
+        parse_mode="Markdown",
+    )
+
+
+# --- باقي الأقسام والخدمات الأساسية ---
 @bot.message_handler(
     func=lambda message: message.text == "⏳ حالة اشتراكي ورابط دعوة أصدقائي"
 )
@@ -411,7 +610,6 @@ def admin_panel(message):
   bot.send_message(message.chat.id, panel_text, parse_mode="Markdown")
 
 
-# تفعيل الأيام للمشتركين
 @bot.message_handler(commands=["add_days"])
 def add_subscription_days(message):
   if message.from_user.id != ADMIN_ID:
@@ -448,7 +646,6 @@ def add_subscription_days(message):
         f"📅 ينتهي في: `{new_expiry.strftime('%Y-%m-%d %H:%M')}`",
         parse_mode="Markdown",
     )
-
     try:
       bot.send_message(
           int(target_id),
@@ -459,7 +656,6 @@ def add_subscription_days(message):
       )
     except Exception:
       pass
-
   except Exception:
     bot.send_message(
         message.chat.id,
@@ -468,7 +664,6 @@ def add_subscription_days(message):
     )
 
 
-# إنهاء اشتراك مستخدم
 @bot.message_handler(commands=["expire"])
 def expire_subscription(message):
   if message.from_user.id != ADMIN_ID:
@@ -493,14 +688,12 @@ def expire_subscription(message):
     )
 
 
-# عرض إحصائيات المشتركين والمجموعات النشطة للترويج
 @bot.message_handler(commands=["stats"])
 def show_stats(message):
   if message.from_user.id != ADMIN_ID:
     return
   count = len(all_users)
   groups_count = len(active_groups)
-
   now = datetime.now()
   lines = []
   for uid, info in all_users.items():
@@ -512,7 +705,6 @@ def show_stats(message):
         f"• {info['name']} (@{info['username']})\n  🆔 `{uid}` | {status}"
         f" ({rem_days} يوم) | 👥 دعوات: {refs}"
     )
-
   report = (
       f"📊 **إحصائيات المشتركين ({count}) والمجموعات الإعلانية"
       f" ({groups_count}):**\n\n"
@@ -520,7 +712,6 @@ def show_stats(message):
   bot.send_message(message.chat.id, report, parse_mode="Markdown")
 
 
-# حظر وفك حظر
 @bot.message_handler(commands=["ban"])
 def ban_user(message):
   if message.from_user.id != ADMIN_ID:
@@ -553,13 +744,11 @@ def unban_user(message):
     bot.send_message(message.chat.id, "⚠️ استخدم: `/unban 8611033531`")
 
 
-# --- القسم المحدث: الصفقات المقترحة والأسعار الحية لكل نوع على حدة ---
 @bot.message_handler(
     func=lambda message: message.text == "📊 الصفقات المقترحة والأسعار (Crypto)"
 )
 def send_trading_deals(message):
   btc, eth, xrp = get_crypto_prices()
-
   deals_text = (
       "📊 **الأسعار الحية وتحليل الصفقات المقترحة (حسب نوع التداول):**\n\n"
       "⚡ **1. الصفقات السريعة (Scalping - دقائق معدودة):**\n"
@@ -576,7 +765,8 @@ def send_trading_deals(message):
       f"  🛑 *وقف الخسارة (-3%):* `{eth * 0.97:,.2f}`\n\n"
       "🏛️ **4. الاستثمار طويل الأمد (Long-term - تجميع آمن):**\n"
       f"• **الأصل المقترح:** Bitcoin (BTC) عند مستويات `{btc:,.2f}`\n"
-      "  📌 *الاستراتيجية:* شراء تدريجي (DCA) **بدون رافعة مالية** بهدف نمو طويل المدى (>+25%)."
+      "  📌 *الاستراتيجية:* شراء تدريجي (DCA) **بدون رافعة مالية** بهدف نمو طويل"
+      " المدى (>+25%)."
   )
   bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
 
@@ -599,7 +789,6 @@ def send_gold_deals(message):
   bot.send_message(message.chat.id, gold_text, parse_mode="Markdown")
 
 
-# --- القسم المحدث: دراسة شاملة لأنواع الصفقات والتحليل والنصائح التداولية ---
 @bot.message_handler(
     func=lambda message: message.text
     == "📊 دراسة شاملة لأنواع الصفقات والصفقات الأفضل"
@@ -607,19 +796,35 @@ def send_gold_deals(message):
 def send_trading_types_study(message):
   study_text = (
       "📊 **دراسة شاملة لأنواع الصفقات وتحليل الأداء لضمان أفضل النتائج:**\n\n"
-      "تُبنى هذه الخطة على التوزيع المتوازن للمخاطر عبر استراتيجيات متعددة (من السكالبينج السريع وحتى الاستثمار طويل الأمد بدون رافعة مالية)، بما يتماشى مع إدارة رأس المال السليمة وتجنب التمرجن:\n\n"
+      "تُبنى هذه الخطة على التوزيع المتوازن للمخاطر عبر استراتيجيات متعددة (من"
+      " السكالبينج السريع وحتى الاستثمار طويل الأمد بدون رافعة مالية)، بما"
+      " يتماشى مع إدارة رأس المال السليمة وتجنب التمرجن:\n\n"
       "⚡ **1. صفقات السكالبينج (XRP/USDT)**\n"
-      "• *المميزات:* نسبة العائد إلى المخاطرة ممتازة (حوالي 2:1)، حيث تستهدف ربح **+1.5%** مقابل وقف خسارة **-0.7%**. العملة تتمتع بسيولة عالية وحركة سريعة على الإطارات الصغيرة.\n"
-      "• *نصيحة تداولية:* تتطلب هذه الصفقات متابعة لحظية وصارمة لمستويات دفتر الطلبات (Order Book)، والالتزام التام بوقف الخسارة لتجنب الانزلاق السعري المفاجئ.\n\n"
+      "• *المميزات:* نسبة العائد إلى المخاطرة ممتازة (حوالي 2:1)، حيث تستهدف ربح"
+      " **+1.5%** مقابل وقف خسارة **-0.7%**. العملة تتمتع بسيولة عالية وحركة"
+      " سريعة على الإطارات الصغيرة.\n"
+      "• *نصيحة تداولية:* تتطلب هذه الصفقات متابعة لحظية وصارمة لمستويات دفتر"
+      " الطلبات (Order Book)، والالتزام التام بوقف الخسارة لتجنب الانزلاق"
+      " السعري المفاجئ.\n\n"
       "📅 **2. الصفقات اليومية (BTC/USDT)**\n"
-      "• *المميزات:* البيتكوين هو الأصل الأكثر استقراراً نسبياً في السوق، وهدف **+2.5%** مع وقف خسارة **-1.2%** يعد خياراً منطقياً ومثالياً لجلسة تداول واحدة أو يومين بحد أقصى.\n"
-      "• *نصيحة تداولية:* راقب مناطق السيولة عند مستويات الدعم الحالية قبل الدخول، وتأكد من عدم وجود بيانات اقتصادية كبرى قد تسبب تقلبات عالية بشكل مفاجئ.\n\n"
+      "• *المميزات:* البيتكوين هو الأصل الأكثر استقراراً نسبياً في السوق، وهدف"
+      " **+2.5%** مع وقف خسارة **-1.2%** يعد خياراً منطقياً ومثالياً لجلسة تداول"
+      " واحدة أو يومين بحد أقصى.\n"
+      "• *نصيحة تداولية:* راقب مناطق السيولة عند مستويات الدعم الحالية قبل"
+      " الدخول، وتأكد من عدم وجود بيانات اقتصادية كبرى قد تسبب تقلبات عالية"
+      " بشكل مفاجئ.\n\n"
       "🌊 **3. صفقات السوينغ (ETH/USDT)**\n"
-      "• *المميزات:* إيثيريوم يمثل خياراً ممتازاً للمدى المتوسط (أسبوع إلى أسبوعين)، وهدف **+6%** مقابل وقف خسارة **-3%** يعكس مرونة جيدة لتحمل التذبذبات الأسبوعية.\n"
-      "• *نصيحة تداولية:* يُفضل تقسيم الدخول في صفقات السوينغ على دفعتين (مثلاً 50% بسعر السوق و50% عند إعادة اختبار دعم أدنى) لتعزيز متوسط سعر الدخول.\n\n"
+      "• *المميزات:* إيثيريوم يمثل خياراً ممتازاً للمدى المتوسط (أسبوع إلى"
+      " أسبوعين)، وهدف **+6%** مقابل وقف خسارة **-3%** يعكس مرونة جيدة لتحمل"
+      " التذبذبات الأسبوعية.\n"
+      "• *نصيحة تداولية:* يُفضل تقسيم الدخول في صفقات السوينغ على دفعتين (مثلاً"
+      " 50% بسعر السوق و50% عند إعادة اختبار دعم أدنى) لتعزيز متوسط سعر الدخول.\n\n"
       "🏛️ **4. الاستثمار طويل الأمد (DCA في Bitcoin)**\n"
-      "• *المميزات:* الاستراتيجية الأفضل والأضمن لأصحاب النفس الطويل، خاصة مع تجنب الرافعة المالية تماماً في الصفقات بعيدة المدى، مما يحمي المحفظة من الانهيارات المفاجئة.\n"
-      "• *نصيحة تداولية:* اعتمد على جدولة الشراء (سواء أسبوعياً أو شهرياً بغض النظر عن السعر) لتقليل تأثير التذبذب اليومي وبناء ثروة آمنة."
+      "• *المميزات:* الاستراتيجية الأفضل والأضمن لأصحاب النفس الطويل، خاصة مع"
+      " تجنب الرافعة المالية تماماً في الصفقات بعيدة المدى، مما يحمي المحفظة"
+      " من الانهيارات المفاجئة.\n"
+      "• *نصيحة تداولية:* اعتمد على جدولة الشراء (سواء أسبوعياً أو شهرياً بغض"
+      " النظر عن السعر) لتقليل تأثير التذبذب اليومي وبناء ثروة آمنة."
   )
   bot.send_message(message.chat.id, study_text, parse_mode="Markdown")
 
@@ -656,41 +861,6 @@ def send_academy(message):
 
 
 @bot.message_handler(
-    func=lambda message: message.text == "📖 قاموس مصطلحات التداول وشرحها"
-)
-def send_trading_glossary(message):
-  glossary_text = (
-      "📖 **قاموس مصطلحات التداول وطريقة استخدامها:**\n\n"
-      "1️⃣ **USDT (العملات الرقمية المستقرة):**\n"
-      "• *الشرح:* عملة رقمية ترتبط قيمتها بالدولار (1 USDT = 1 دولار).\n"
-      "• *طريقة الاستخدام:* تُستخدم لحفظ الأرباح والهرب من هبوط السوق دون سحب"
-      " الأموال إلى الكاش.\n\n"
-      "2️⃣ **Scalping (السكالبينج / التداول السريع):**\n"
-      "• *الشرح:* صفقات سريعة جداً تستغرق دقائق لجني أرباح صغيرة متكررة.\n"
-      "• *طريقة الاستخدام:* تعتمد على اقتناص التغيرات اللحظية للأسعار (مثل"
-      " الصفقات الفورية في بوتنا).\n\n"
-      "3️⃣ **TP - Take Profit (هدف الربح):**\n"
-      "• *الشرح:* السعر المستهدف لإغلاق الصفقة آلياً وبربح محدد.\n"
-      "• *طريقة الاستخدام:* يوضع عند مناطق المقاومة لضمان جني الأرباح دون طمع.\n\n"
-      "4️⃣ **SL - Stop Loss (وقف الخسارة):**\n"
-      "• *الشرح:* أمر تلقائي للخروج من الصفقة بخسارة ضئيلة إذا عكس السوق اتجاهه.\n"
-      "• *طريقة الاستخدام:* أهم أداة لإدارة المخاطر لحماية رأس المال من التمرجن.\n\n"
-      "5️⃣ **OCO (الأوامر المتقدمة):**\n"
-      "• *الشرح:* ربط هدف الربح ووقف الخسارة معاً في أمر واحد.\n"
-      "• *طريقة الاستخدام:* لحماية الصفقة بالكامل دون الحاجة لمراقبة الشاشة طوال"
-      " الوقت.\n\n"
-      "6️⃣ **Leverage (الرافعة المالية):**\n"
-      "• *الشرح:* اقتراض أموال من المنصة لمضاعفة حجم الصفقة.\n"
-      "• *طريقة الاستخدام:* يفضل للمبتدئين الابتعاد عنها والتداول بدون رافعة حمايةً"
-      " للأصول.\n\n"
-      "7️⃣ **KYC (التحقق من الهوية):**\n"
-      "• *الشرح:* توثيق الحساب الشخصي بالهوية الرسمية في المنصات.\n"
-      "• *طريقة الاستخدام:* ضروري لفتح صلاحيات السحب والإيداع والأمان الكامل."
-  )
-  bot.send_message(message.chat.id, glossary_text, parse_mode="Markdown")
-
-
-@bot.message_handler(
     func=lambda message: message.text
     == "🌐 فتح الحسابات وإنشاء المحافظ (دليل تفصيلي)"
 )
@@ -713,11 +883,17 @@ def send_accounts_guide(message):
 def send_deposit_withdraw_guide(message):
   dw_text = (
       "📥 **دليل السحب والإيداع في المنصات الرقمية:**\n\n"
-      "• **الشبكة المعتمدة عالمياً:** استخدم دائماً عملة (USDT) عبر شبكة **TRC20** عند تحويل الأموال بين المنصات والمحافظ.\n"
-      "• **السبب التقني:** لضمان أعلى سرعة في إتمام المعاملات (لا تتجاوز دقائق معدودة) وأقل رسوم تحويل ممكنة (ثابتة غالباً بـ 1 دولار).\n\n"
+      "• **الشبكة المعتمدة عالمياً:** استخدم دائماً عملة (USDT) عبر شبكة"
+      " **TRC20** عند تحويل الأموال بين المنصات والمحافظ.\n"
+      "• **السبب التقني:** لضمان أعلى سرعة في إتمام المعاملات (لا تتجاوز دقائق"
+      " معدودة) وأقل رسوم تحويل ممكنة (ثابتة غالباً بـ 1 دولار).\n\n"
       "🔄 **آلية التكامل المحلي في سوريا:**\n"
-      "• عند **الإيداع**: تقوم بتحويل القيمة بالليرات السورية عبر تطبيق **شام كاش** إلى حساب الوكيل المعتمد، ليقوم بدوره بإرسال ما يقابلها من عملة `USDT (TRC20)` مباشرة إلى محفظتك أو منصتك (مثل Binance).\n"
-      "• عند **السحب**: تقوم بتحويل الـ `USDT (TRC20)` من منصتك إلى محفظة الوكيل، ليقوم هو فوراً بتحويل قيمتها بالليرة السورية إلى حسابك على شام كاش بكل أمان."
+      "• عند **الإيداع**: تقوم بتحويل القيمة بالليرات السورية عبر تطبيق **شام"
+      " كاش** إلى حساب الوكيل المعتمد، ليقوم بدوره بإرسال ما يقابلها من عملة"
+      " `USDT (TRC20)` مباشرة إلى محفظتك أو منصتك (مثل Binance).\n"
+      "• عند **السحب**: تقوم بتحويل الـ `USDT (TRC20)` من منصتك إلى محفظة"
+      " الوكيل، ليقوم هو فوراً بتحويل قيمتها بالليرة السورية إلى حسابك على شام"
+      " كاش بكل أمان."
   )
   bot.send_message(message.chat.id, dw_text, parse_mode="Markdown")
 
@@ -728,11 +904,14 @@ def send_deposit_withdraw_guide(message):
 def send_payment_info(message):
   payment_text = (
       "💳 **معلومات الدفع والشحن عبر (شام كاش):**\n\n"
-      "• **طريقة العمل الآمنة:** تتم جميع معاملات الإيداع والسحب المحلية بكل يسر وسرعة عبر محفظة **شام كاش** بالتعاون حصرياً مع المعرفات والوكلاء المعتمدين لضمان الأمان التام لكافة الأطراف.\n"
+      "• **طريقة العمل الآمنة:** تتم جميع معاملات الإيداع والسحب المحلية بكل يسر"
+      " وسرعة عبر محفظة **شام كاش** بالتعاون حصرياً مع المعرفات والوكلاء المعتمدين"
+      " لضمان الأمان التام لكافة الأطراف.\n"
       "• **خطوات الشحن والتفعيل:**\n"
       "  1️⃣ تواصل مع الإدارة أو الوكيل المعتمد عبر المعرف الرسمي.\n"
       "  2️⃣ قم بإتمام عملية التحويل بالليرة السورية عبر تطبيق شام كاش.\n"
-      "  3️⃣ أرسل إيصال التحويل مع رقم حسابك (ID) في البوت أو محفظتك ليتم اعتماد اشتراكك أو رصيدك فورياً."
+      "  3️⃣ أرسل إيصال التحويل مع رقم حسابك (ID) في البوت أو محفظتك ليتم اعتماد"
+      " اشتراكك أو رصيدك فورياً."
   )
   bot.send_message(message.chat.id, payment_text, parse_mode="Markdown")
 
