@@ -26,6 +26,7 @@ bot = telebot.TeleBot(TOKEN)
 
 ADMIN_ID = 8611033531
 USERS_FILE = "users_data.json"
+GROUPS_FILE = "groups_data.json"
 
 
 def load_data(filename):
@@ -43,6 +44,7 @@ def save_data(filename, data):
     json.dump(data, f, ensure_ascii=False, indent=4)
 
 
+# --- دالة حساب نسبة الربح المئوية للصفقة ---
 def calculate_profit_percentage(entry_price, target_price, direction="BUY"):
   try:
     entry = float(entry_price)
@@ -56,12 +58,30 @@ def calculate_profit_percentage(entry_price, target_price, direction="BUY"):
     return 0.0
 
 
-# --- أمر البداية /start وإغلاق ثغرة التجربة نهائياً ---
+# --- القائمة الرئيسية (الأزرار كاملة وثابتة) ---
+def get_main_menu():
+  markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
+  btn1 = types.KeyboardButton("📊 الصفقات المقترحة والرسوم البيانية")
+  btn2 = types.KeyboardButton("🟡 صفقات الذهب اليومية والاستثمارية")
+  btn3 = types.KeyboardButton("🧮 حاسبة المخاطر وحجم الصفقة")
+  btn4 = types.KeyboardButton("📚 الأكاديمية التعليمية للمبتدئين")
+  btn5 = types.KeyboardButton("🛡️ استراتيجية التأمين (DCA)")
+  btn6 = types.KeyboardButton("ℹ️ معلومات اشتراكي")
+  btn7 = types.KeyboardButton("🔔 ضبط تنبيه سعر مخصص (/alert)")
+  btn8 = types.KeyboardButton("🧠 اختبار تداولي تفاعلي (Quiz)")
+  btn9 = types.KeyboardButton("📚 قاموس مصطلحات التداول (بحث ذكي)")
+  btn10 = types.KeyboardButton("📥 دليل السحب والإيداع (شبكة TRC20)")
+  markup.add(btn1, btn2, btn3, btn4, btn5, btn6, btn7, btn8, btn9, btn10)
+  return markup
+
+
+# --- أمر البداية /start وإغلاق ثغرة التجربة نهائياً مع إبقاء الأزرار ظاهرة ---
 @bot.message_handler(commands=["start"])
 def handle_start(message):
   user_id = str(message.from_user.id)
   users = load_data(USERS_FILE)
 
+  # التحقق مما إذا كان المستخدم مسجلاً مسبقاً (حتى لو مسح المحادثة أو انتهى اشتراكه)
   if user_id in users:
     bot.send_message(
         message.chat.id,
@@ -70,6 +90,7 @@ def handle_start(message):
     )
     return
 
+  # مستخدم جديد كلياً لأول مرة
   trial_days = 3
   expiry_date = (
       datetime.datetime.now() + datetime.timedelta(days=trial_days)
@@ -81,9 +102,11 @@ def handle_start(message):
       "joined_date": datetime.datetime.now().isoformat(),
       "expiry_date": expiry_date,
       "is_trial_used": True,
+      "invites": 0,
   }
   save_data(USERS_FILE, users)
 
+  # إرسال تنبيه فوري للمطور
   try:
     bot.send_message(
         ADMIN_ID,
@@ -103,18 +126,7 @@ def handle_start(message):
   )
 
 
-def get_main_menu():
-  markup = types.ReplyKeyboardMarkup(resize_keyboard=True, row_width=2)
-  btn1 = types.KeyboardButton("📊 الصفقات المقترحة")
-  btn2 = types.KeyboardButton("🟡 صفقات الذهب XAUUSD")
-  btn3 = types.KeyboardButton("🧮 حاسبة المخاطر")
-  btn4 = types.KeyboardButton("📚 الأكاديمية والقاموس")
-  btn5 = types.KeyboardButton("🛡️ استراتيجية التأمين (DCA)")
-  btn6 = types.KeyboardButton("ℹ️ معلومات اشتراكي")
-  markup.add(btn1, btn2, btn3, btn4, btn5, btn6)
-  return markup
-
-
+# --- نموذج إرسال الصفقة مع النسب المئوية للأهداف ---
 def format_trade_signal(
     coin, entry, tp1, tp2, sl, direction="BUY", notes="توصية سبوت آمنة"
 ):
@@ -136,6 +148,7 @@ def format_trade_signal(
   return signal_text
 
 
+# --- لوحة تحكم المطور (الإحصائيات) ---
 @bot.message_handler(commands=["users"])
 def admin_users_list(message):
   if message.from_user.id != ADMIN_ID:
@@ -147,22 +160,33 @@ def admin_users_list(message):
   bot.send_message(message.chat.id, text, parse_mode="Markdown")
 
 
+# --- معالجة الأزرار والخدمات ---
 @bot.message_handler(func=lambda message: True)
 def handle_text_messages(message):
   text = message.text
   user_id = str(message.from_user.id)
 
-  if text == "📊 الصفقات المقترحة":
+  if text == "📊 الصفقات المقترحة والرسوم البيانية":
     sample_signal = format_trade_signal(
         "BTC/USDT", 64200, 66500, 68800, 62800, "BUY", "تحليلي فني للسبوت"
     )
-    bot.send_message(message.chat.id, sample_signal, parse_mode="Markdown")
+    bot.send_message(
+        message.chat.id,
+        sample_signal,
+        reply_markup=get_main_menu(),
+        parse_mode="Markdown",
+    )
 
-  elif text == "🟡 صفقات الذهب XAUUSD":
+  elif text == "🟡 صفقات الذهب اليومية والاستثمارية":
     sample_gold = format_trade_signal(
         "XAUUSD (الذهب)", 2380, 2405, 2430, 2365, "BUY", "تذبذب جلسة نيويورك"
     )
-    bot.send_message(message.chat.id, sample_gold, parse_mode="Markdown")
+    bot.send_message(
+        message.chat.id,
+        sample_gold,
+        reply_markup=get_main_menu(),
+        parse_mode="Markdown",
+    )
 
   elif text == "ℹ️ معلومات اشتراكي":
     users = load_data(USERS_FILE)
@@ -172,29 +196,63 @@ def handle_text_messages(message):
       bot.send_message(
           message.chat.id,
           f"👤 **معلومات حسابك:**\n🆔 المعرف: `{user_id}`\n📅 تاريخ انتهاء الاشتراك: `{expiry}`",
+          reply_markup=get_main_menu(),
           parse_mode="Markdown",
       )
     else:
       bot.send_message(
-          message.chat.id, "أرسل /start لتسجيل حسابك وبدء الفترة التجريبية."
+          message.chat.id,
+          "أرسل /start لتسجيل حسابك وبدء الفترة التجريبية.",
+          reply_markup=get_main_menu(),
       )
 
-  elif text == "🧮 حاسبة المخاطر":
+  elif text == "🧮 حاسبة المخاطر وحجم الصفقة":
     bot.send_message(
         message.chat.id,
         "🧮 **حاسبة المخاطر:**\nادخل حجم رأس مالك ونسبة المخاطرة (مثلاً 1%) ليتم حساب الخسارة القصوى بأمان.",
+        reply_markup=get_main_menu(),
     )
 
-  elif text == "📚 الأكاديمية والقاموس":
+  elif text == "📚 الأكاديمية التعليمية للمبتدئين":
     bot.send_message(
         message.chat.id,
-        "📚 **الأكاديمية التعليمية:**\nاستخدم الأمر `/search` متبوعاً بالمصطلح للبحث السريع في قاموس الحيتان والمفاهيم.",
+        "📚 **الأكاديمية التعليمية:**\nمرجعك الشامل لفهم الأسواق وإدارة المخاطر خطوة بخطوة.",
+        reply_markup=get_main_menu(),
     )
 
   elif text == "🛡️ استراتيجية التأمين (DCA)":
     bot.send_message(
         message.chat.id,
         "🛡️ **استراتيجية حماية الأصل الأساسي:**\nنظام يعتمد على جني 25% من الأرباح الصافية وتحويلها لـ USDT دون المساس بكمية الأصول الأساسية (مثل البيتكوين).",
+        reply_markup=get_main_menu(),
+    )
+
+  elif text == "🔔 ضبط تنبيه سعر مخصص (/alert)":
+    bot.send_message(
+        message.chat.id,
+        "🔔 أرسل الأمر متبوعاً بالعملة والسعر، مثل: `/alert BTC 65000`",
+        reply_markup=get_main_menu(),
+    )
+
+  elif text == "🧠 اختبار تداولي تفاعلي (Quiz)":
+    bot.send_message(
+        message.chat.id,
+        "🧠 أهلاً بك في اختبار الوعي التداولي! جاهز للإجابة على الأسئلة؟",
+        reply_markup=get_main_menu(),
+    )
+
+  elif text == "📚 قاموس مصطلحات التداول (بحث ذكي)":
+    bot.send_message(
+        message.chat.id,
+        "📚 استخدم الأمر `/search` متبوعاً بالمصطلح للبحث في قاموس الحيتان والمفاهيم.",
+        reply_markup=get_main_menu(),
+    )
+
+  elif text == "📥 دليل السحب والإيداع (شبكة TRC20)":
+    bot.send_message(
+        message.chat.id,
+        "📥 دليل العمليات وشبكة TRC20 ومعلومات الشحن عبر محفظة شام كاش.",
+        reply_markup=get_main_menu(),
     )
 
 
@@ -205,12 +263,12 @@ if __name__ == "__main__":
   flask_thread.start()
   print("Flask web server started successfully...")
 
-  # حل مشكلة التعارض: حذف أي Webhook قديم فورا قبل تشغيل الـ Polling
+  # حذف الويب هوك القديم لتجنب التعارض (خطأ 409)
   try:
     bot.remove_webhook()
     print("Webhook removed successfully. Starting polling...")
   except Exception as e:
     print(f"Error removing webhook: {e}")
 
-  # تشغيل بوت تيليجرام
+  # تشغيل البوت
   bot.infinity_polling()
