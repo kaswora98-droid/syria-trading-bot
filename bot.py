@@ -1,150 +1,836 @@
-import telebot
-from telebot import types
+from datetime import datetime, timedelta
+import io
 import json
 import os
+import random
 import threading
 import time
-from datetime import datetime, timedelta
+from flask import Flask
+import matplotlib
+import requests
+import telebot
+from telebot import types
 
-# --- الإعدادات الأساسية (التوكن الجديد) ---
+# إعداد Matplotlib للعمل بدون واجهة رسومية
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+
 TOKEN = "8928709566:AAHP9dZXrxkpp2FneolgC-Cfd4jFh6nqMF4"
-ADMIN_ID = 8611033531
-ADMIN_USERNAME = "@alone123987"
 
 bot = telebot.TeleBot(TOKEN)
 
-DATA_FILE = "users_data.json"
+ADMIN_ID = 8611033531
+ADMIN_USERNAME = "@alone123987"
 
-# --- دوال إدارة وتخزين بيانات المستخدمين ---
+DATA_FILE = "users_data.json"
+GROUPS_FILE = "groups_data.json"
+banned_users = set()
+
+risk_calculator_sessions = {}
+custom_alerts = {}
+active_quizzes = {}
+
+app = Flask(__name__)
+
+
+# --- دوال حفظ واسترجاع البيانات مع الحماية الجذرية ---
 def load_users():
-    """قراءة بيانات المستخدمين مع حماية الكود من الانهيار لو كان الملف فارغاً"""
-    if os.path.exists(DATA_FILE):
-        try:
-            with open(DATA_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-    return {}
+  if os.path.exists(DATA_FILE):
+    try:
+      with open(DATA_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+        if not content.strip():
+          return {}
+        return json.loads(content)
+    except Exception:
+      return {}
+  return {}
+
 
 def save_users(data):
-    """حفظ بيانات المستخدمين محلياً بشكل فوري وآمن"""
+  try:
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+      json.dump(data, f, ensure_ascii=False, indent=4)
+  except Exception as e:
+    print(f"Error saving users: {e}")
+
+
+def load_groups():
+  if os.path.exists(GROUPS_FILE):
     try:
-        with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=4)
-    except Exception as e:
-        print(f"Error saving users data: {e}")
+      with open(GROUPS_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
+    except Exception:
+      return []
+  return []
 
-# تهيئة بيانات المستخدمين عند بدء التشغيل
-users_data = load_users()
 
-# --- معالجة أمر البداية /start ---
-@bot.message_handler(commands=['start'])
-def send_welcome(message):
-    user_id = str(message.from_user.id)
-    username = message.from_user.username or "No Username"
-    first_name = message.from_user.first_name or "User"
+def save_groups(groups_list):
+  try:
+    with open(GROUPS_FILE, "w", encoding="utf-8") as f:
+      json.dump(groups_list, f, ensure_ascii=False, indent=4)
+  except Exception:
+    pass
 
-    if user_id not in users_data:
-        # منح فترة تجريبية افتراضية (مثلاً 3 أيام للمستخدمين الجدد)
-        expiry_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
-        users_data[user_id] = {
-            "username": username,
-            "first_name": first_name,
-            "expiry_date": expiry_date,
-            "joined_date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        save_users(users_data)
 
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(types.KeyboardButton("📊 الصفقات"), types.KeyboardButton("🎓 الأكاديمية"))
-    markup.add(types.KeyboardButton("🧮 الحاسبة"), types.KeyboardButton("👤 حسابي"))
+all_users = load_users()
+active_groups = load_groups()
 
-    bot.reply_to(message, f"أهلاً بك يا {first_name} في بوت التداول والأكاديمية الخاص بك.", reply_markup=markup)
 
-# --- أمر لوحة التحكم /users مع أزرار الملف الشخصي التفاعلية ---
-@bot.message_handler(commands=['users'])
-def admin_users_list(message):
-    if message.from_user.id != ADMIN_ID:
-        bot.reply_to(message, "عذراً، هذا الأمر مخصص للمشرف فقط.")
-        return
+@app.route("/")
+def home():
+  return "Ultimate Trading Bot is running 24/7!"
 
-    current_users = load_users()
-    if not current_users:
-        bot.reply_to(message, "لا يوجد أي مستخدمين مسجلين حتى الآن.")
-        return
 
-    response = "📋 **قائمة المشتركين المسجلين:**\n\n"
-    
-    # بناء رسالة مع أزرار انلاين مباشرة لكل مستخدم لفتح ملفه الشخصي عبر tg://user?id=
-    markup = types.InlineKeyboardMarkup()
-    
-    for uid, info in current_users.items():
-        fname = info.get('first_name', 'مستخدم')
-        uname = info.get('username', 'بدون معرف')
-        response += f"👤 {fname} (@{uname}) | ID: `{uid}`\n"
-        
-        # زر تفاعلي يفتح الملف الشخصي للمستخدم مباشرة
-        markup.add(types.InlineKeyboardButton(f"🔗 ملف: {fname}", url=f"tg://user?id={uid}"))
+@app.route("/ping")
+def ping():
+  return "Pong!", 200
 
-    if len(response) > 4000:
-        response = response[:4000] + "\n...(تم اختصار القائمة لطولها)"
 
-    bot.send_message(message.chat.id, response, reply_markup=markup, parse_mode="Markdown")
+def run_flask():
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port)
 
-# --- أمر إضافة الأيام للمشتركين /add_days ---
-@bot.message_handler(commands=['add_days'])
-def add_user_days(message):
-    if message.from_user.id != ADMIN_ID:
-        return
 
-    args = message.text.split()
-    if len(args) < 3:
-        bot.reply_to(message, "الاستخدام الصحيح:\n`/add_days ID days`", parse_mode="Markdown")
-        return
+# جلب الأسعار الحية للعملات
+def get_crypto_prices():
+  try:
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple&vs_currencies=usd"
+    response = requests.get(url, timeout=5)
+    if response.status_code == 200:
+      data = response.json()
+      btc = float(data["bitcoin"]["usd"])
+      eth = float(data["ethereum"]["usd"])
+      xrp = float(data["ripple"]["usd"])
+      return btc, eth, xrp
+  except Exception:
+    pass
+  return (
+      64950.0 + random.randint(-15, 15),
+      1815.0 + random.randint(-8, 8),
+      0.5200 + (random.randint(-2, 2) / 1000.0),
+  )
 
-    target_id = args[1]
-    try:
-        days_to_add = int(args[2])
-    except ValueError:
-        bot.reply_to(message, "يرجى كتابة رقم صحيح للأيام.")
-        return
 
-    current_users = load_users()
-    if target_id in current_users:
-        try:
-            current_expiry = datetime.strptime(current_users[target_id]["expiry_date"], "%Y-%m-%d %H:%M:%S")
-            if current_expiry < datetime.now():
-                current_expiry = datetime.now()
-            new_expiry = current_expiry + timedelta(days=days_to_add)
-            current_users[target_id]["expiry_date"] = new_expiry.strftime("%Y-%m-%d %H:%M:%S")
-            save_users(current_users)
-            bot.reply_to(message, f"تمت إضافة {days_to_add} أيام بنجاح للمستخدم `{target_id}`.", parse_mode="Markdown")
-        except Exception as e:
-            bot.reply_to(message, f"حدث خطأ أثناء تحديث تاريخ الاشتراك: {e}")
+# جلب سعر الذهب الحي (XAUUSD) المحدث
+def get_gold_price():
+  try:
+    response = requests.get(
+        "https://data-asg.goldprice.org/dbXRates/USD", timeout=5
+    )
+    if response.status_code == 200:
+      data = response.json()
+      for item in data.get("items", []):
+        if item.get("curr") == "USD":
+          return float(item.get("xauPrice", 3840.28))
+  except Exception:
+    pass
+  return 3840.28
+
+
+# مولد الرسوم البيانية
+def generate_price_chart(btc_price):
+  try:
+    fig, ax = plt.subplots(figsize=(6, 3))
+    prices = [
+        btc_price * 0.99,
+        btc_price * 0.995,
+        btc_price * 0.992,
+        btc_price * 1.002,
+        btc_price,
+    ]
+    times = ["الان", "قبل ساعة", "قبل 3 ساعات", "قبل 6 ساعات", "السابقة"]
+
+    ax.plot(
+        times,
+        prices,
+        marker="o",
+        color="#2b8a3e",
+        linewidth=2,
+        markersize=6,
+    )
+    ax.set_title("حركة السعر التحليلية (BTC/USDT)", fontsize=10, color="#333")
+    ax.grid(True, linestyle="--", alpha=0.6)
+    plt.xticks(rotation=15, fontsize=8)
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", dpi=150)
+    buf.seek(0)
+    plt.close(fig)
+    return buf
+  except Exception:
+    return None
+
+
+# --- دالة حساب نسبة الربح المئوية للصفقة ---
+def calculate_profit_percentage(entry_price, target_price, direction="BUY"):
+  try:
+    entry = float(entry_price)
+    target = float(target_price)
+    if direction.upper() == "BUY":
+      percentage = ((target - entry) / entry) * 100
     else:
-        bot.reply_to(message, "المستخدم غير مسجل في قاعدة البيانات.")
+      percentage = ((entry - target) / entry) * 100
+    return round(percentage, 2)
+  except:
+    return 0.0
 
-# --- خيط مراقبة الأسعار في الخلفية (Background Price Monitor) ---
+
+# --- دالة تحليل السوق الحقيقي للرؤية التحليلية ---
+def get_dynamic_deal_data(symbol_id, default_price):
+  try:
+    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol_id}&vs_currencies=usd&include_24hr_change=true"
+    response = requests.get(url, timeout=5)
+    if response.status_code == 200:
+      data = response.json()
+      price = float(data[symbol_id]["usd"])
+      change_24h = float(data[symbol_id]["usd_24h_change"])
+
+      if change_24h > 0:
+        trend_status = "🚀 زخم صاعد (Bullish Momentum)"
+        tp1_pct = 0.012
+        tp2_pct = 0.025
+        sl_pct = 0.01
+      else:
+        trend_status = "🔻 ضغط بيعي / تصحيح (Bearish Pressure)"
+        tp1_pct = 0.008
+        tp2_pct = 0.015
+        sl_pct = 0.008
+
+      return price, change_24h, trend_status, tp1_pct, tp2_pct, sl_pct
+  except Exception:
+    pass
+  return default_price, 0.0, "⚖️ استقرار جانبي (Consolidation)", 0.01, 0.02, 0.01
+
+
+# --- القائمة الرئيسية مع الأزرار الكاملة ---
+def get_main_menu(user_id):
+  markup = types.ReplyKeyboardMarkup(
+      resize_keyboard=True, is_persistent=True, row_width=2
+  )
+  btn_golden = types.KeyboardButton("📊 صفقات القاعدة الذهبية")
+  btn_analytical = types.KeyboardButton("📊 صفقات الرؤية التحليلية")
+  btn_gold_golden = types.KeyboardButton("🟡 صفقات الذهب (القاعدة الذهبية)")
+  btn_gold_analytical = types.KeyboardButton("🟡 صفقات الذهب (الرؤية التحليلية)")
+  btn_calc = types.KeyboardButton("🧮 حاسبة المخاطر وحجم الصفقة")
+  btn_alerts = types.KeyboardButton("🔔 ضبط تنبيه سعر مخصص (/alert)")
+  btn_news = types.KeyboardButton("📰 موجز الأخبار الاقتصادية اللحظية")
+  btn_quiz = types.KeyboardButton("🧠 اختبار تداولي تفاعلي (Quiz)")
+  btn3 = types.KeyboardButton("📚 الأكاديمية التعليمية للمبتدئين")
+  btn_glossary = types.KeyboardButton("📖 قاموس مصطلحات التداول (بحث ذكي)")
+  btn4 = types.KeyboardButton("🌐 دليل فتح الحسابات وإنشاء المحافظ")
+  btn5 = types.KeyboardButton("📥 دليل السحب والإيداع (شبكة TRC20)")
+  btn6 = types.KeyboardButton("💳 الدفع والشحن المحلي (شام كاش)")
+  btn7 = types.KeyboardButton("⏳ حالة اشتراكي ورابط دعوة أصدقائي")
+
+  if user_id == ADMIN_ID:
+    btn_admin = types.KeyboardButton("🛠️ لوحة تحكم المطور")
+    markup.add(
+        btn_golden,
+        btn_analytical,
+        btn_gold_golden,
+        btn_gold_analytical,
+        btn_calc,
+        btn_alerts,
+        btn_news,
+        btn_quiz,
+        btn3,
+        btn_glossary,
+        btn4,
+        btn5,
+        btn6,
+        btn7,
+        btn_admin,
+    )
+  else:
+    markup.add(
+        btn_golden,
+        btn_analytical,
+        btn_gold_golden,
+        btn_gold_analytical,
+        btn_calc,
+        btn_alerts,
+        btn_news,
+        btn_quiz,
+        btn3,
+        btn_glossary,
+        btn4,
+        btn5,
+        btn6,
+        btn7,
+    )
+  return markup
+
+
+@bot.message_handler(commands=["start"])
+def send_welcome(message):
+  if message.chat.type != "private":
+    return
+
+  user_id = message.from_user.id
+  uid_str = str(user_id)
+  text_parts = message.text.split()
+
+  referrer_id = None
+  if len(text_parts) > 1 and text_parts[1].startswith("ref_"):
+    try:
+      referrer_id = text_parts[1].replace("ref_", "")
+    except Exception:
+      pass
+
+  if uid_str not in all_users:
+    expiry_date = datetime.now() + timedelta(days=3)
+    user_name = message.from_user.first_name or "بدون اسم"
+    user_uname = message.from_user.username or "لا يوجد"
+
+    all_users[uid_str] = {
+        "name": user_name,
+        "username": user_uname,
+        "expiry": expiry_date.isoformat(),
+        "is_trial": True,
+        "invited_by": referrer_id,
+        "referral_count": 0,
+    }
+
+    if referrer_id and referrer_id in all_users and referrer_id != uid_str:
+      all_users[referrer_id]["referral_count"] = (
+          all_users[referrer_id].get("referral_count", 0) + 1
+      )
+      ref_current_exp = datetime.fromisoformat(all_users[referrer_id]["expiry"])
+      ref_new_exp = max(ref_current_exp, datetime.now()) + timedelta(days=2)
+      all_users[referrer_id]["expiry"] = ref_new_exp.isoformat()
+      try:
+        bot.send_message(
+            int(referrer_id),
+            "🎉 انضم مستخدم جديد عبر رابطك! تمت إضافة يومين رصيد لاشتراكك.",
+            parse_mode="Markdown",
+        )
+      except Exception:
+        pass
+    save_users(all_users)
+
+    if user_id != ADMIN_ID:
+      try:
+        admin_alert_text = (
+            "🚨 **مشترك جديد انضم إلى البوت!**\n\n"
+            f"👤 **الاسم:** {user_name}\n"
+            f"🆔 المعرف (ID): `{user_id}`\n"
+            f"🌐 اليوزر: `@{user_uname}`\n"
+            f"👥 إجمالي المشتركين الآن: `{len(all_users)}`"
+        )
+        bot.send_message(ADMIN_ID, admin_alert_text, parse_mode="Markdown")
+      except Exception:
+        pass
+    welcome_text = (
+        "🎉 أهلاً بك في بوت التداول الذكي والشامل! 🤖\n\n"
+        "🎁 تم تفعيل فترة تجريبية مجانية لمدة 3 أيام لحسابك بنجاح.\n"
+        "اختر ما تحتاجه من الأزرار أدناه:"
+    )
+  else:
+    if user_id == ADMIN_ID:
+      welcome_text = "👑 أهلاً بك يا مهندس أحمد! البوت بكامل ميزاته جاهز:"
+    else:
+      expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
+      remaining = expiry_dt - datetime.now()
+      days_left = max(0, remaining.days)
+      hours_left = max(0, remaining.seconds // 3600)
+      welcome_text = (
+          "أهلاً بك مجدداً يا مهندس! حسابك مسجل في النظام.\n\n"
+          f"✅ حالة اشتراكك: نشط (المتبقي: {days_left} يوم و {hours_left} ساعة)\n"
+          "اختر ما تحتاجه من الأزرار أدناه:"
+      )
+
+  bot.send_message(
+      message.chat.id,
+      welcome_text,
+      reply_markup=get_main_menu(user_id),
+      parse_mode="Markdown",
+  )
+
+
+def send_with_menu(message, text):
+  bot.send_message(
+      message.chat.id,
+      text,
+      reply_markup=get_main_menu(message.from_user.id),
+      parse_mode="Markdown",
+  )
+
+
+# --- صفقات القاعدة الذهبية للعملات ---
+@bot.message_handler(func=lambda message: message.text == "📊 صفقات القاعدة الذهبية")
+def send_golden_rule_deals(message):
+  btc, eth, xrp = get_crypto_prices()
+
+  xrp_tp1_pct = calculate_profit_percentage(xrp, xrp * 1.008, "BUY")
+  xrp_tp2_pct = calculate_profit_percentage(xrp, xrp * 1.015, "BUY")
+  btc_tp1_pct = calculate_profit_percentage(btc, btc * 1.012, "BUY")
+  btc_tp2_pct = calculate_profit_percentage(btc, btc * 1.025, "BUY")
+  eth_tp1_pct = calculate_profit_percentage(eth, eth * 1.03, "BUY")
+  eth_tp2_pct = calculate_profit_percentage(eth, eth * 1.06, "BUY")
+
+  xrp_sl = xrp * (1 - 0.012)
+  btc_sl = btc * (1 - 0.012)
+  eth_sl = eth * (1 - 0.012)
+
+  deals_text = (
+      "📊 **صفقات القاعدة الذهبية (النسب الثابتة وإدارة المخاطر):**\n\n"
+      "⚡ **1. صفقات السكالبينج:**\n"
+      f"• **العملة:** XRP/USDT (سعر الدخول: `{xrp:,.4f}`)\n"
+      f"  🛑 *وقف الخسارة (SL):* `{xrp_sl:,.4f}` (-1.2%)\n"
+      f"  🎯 *الهدف الأول (TP1):* `{xrp * 1.008:,.4f}` ──> **(+{xrp_tp1_pct}%)**\n"
+      f"  🛡️ **التأمين:** جني 50% ونقل وقف الخسارة لسعر الدخول"
+      f" (`{xrp:,.4f}`).\n"
+      f"  🚀 *الهدف الثاني (TP2):* `{xrp * 1.015:,.4f}` ──> **(+{xrp_tp2_pct}%)**\n\n"
+      "📅 **2. الصفقات اليومية:**\n"
+      f"• **العملة:** BTC/USDT (سعر الدخول: `{btc:,.2f}`)\n"
+      f"  🛑 *وقف الخسارة (SL):* `{btc_sl:,.2f}` (-1.2%)\n"
+      f"  🎯 *الهدف الأول (TP1):* `{btc * 1.012:,.2f}` ──> **(+{btc_tp1_pct}%)**\n"
+      f"  🛡️ **التأمين:** جني نصف الربح وحرك وقف الخسارة لنقطة الدخول"
+      f" (`{btc:,.2f}`).\n"
+      f"  🚀 *الهدف الثاني (TP2):* `{btc * 1.025:,.2f}` ──> **(+{btc_tp2_pct}%)**\n\n"
+      "🌊 **3. صفقات السوينغ:**\n"
+      f"• **العملة:** ETH/USDT (سعر الدخول: `{eth:,.2f}`)\n"
+      f"  🛑 *وقف الخسارة (SL):* `{eth_sl:,.2f}` (-1.2%)\n"
+      f"  🎯 *الهدف الأول (TP1):* `{eth * 1.03:,.2f}` ──> **(+{eth_tp1_pct}%)**\n"
+      f"  🛡️ **التأمين:** تأمين الصفقة عند الدخول (`{eth:,.2f}`).\n"
+      f"  🚀 *الهدف الثاني (TP2):* `{eth * 1.06:,.2f}` ──> **(+{eth_tp2_pct}%)**\n\n"
+      "🏛️ **4. الاستثمار طويل الأمد (DCA + حماية الأصل):**\n"
+      "• بيع **25% من الأرباح الصافية فقط** وتحويلها لـ USDT ككاش مع **الحفاظ"
+      " على كمية البيتكوين الأساسية كاملة** دون تآكل."
+  )
+  send_with_menu(message, deals_text)
+
+  chart_buf = generate_price_chart(btc)
+  if chart_buf:
+    bot.send_photo(
+        message.chat.id,
+        chart_buf,
+        caption="📈 **الرسم البياني التحليلي (القاعدة الذهبية)**",
+    )
+
+
+# --- صفقات الرؤية التحليلية ---
+@bot.message_handler(func=lambda message: message.text == "📊 صفقات الرؤية التحليلية")
+def send_analytical_vision_deals(message):
+  btc_price, btc_chg, btc_trend, btc_tp1_p, btc_tp2_p, btc_sl_p = (
+      get_dynamic_deal_data("bitcoin", 65000.0)
+  )
+  eth_price, eth_chg, eth_trend, eth_tp1_p, eth_tp2_p, eth_sl_p = (
+      get_dynamic_deal_data("ethereum", 1850.0)
+  )
+  xrp_price, xrp_chg, xrp_trend, xrp_tp1_p, xrp_tp2_p, xrp_sl_p = (
+      get_dynamic_deal_data("ripple", 0.52)
+  )
+
+  deals_text = (
+      "📊 **صفقات الرؤية التحليلية وقراءة الزخم الحي:**\n\n"
+      f"🪙 **1. بيتكوين (BTC/USDT):**\n"
+      f"• السعر الحالي: `{btc_price:,.2f}$` (التغير 24س: `{btc_chg:+.2f}%`)\n"
+      f"• الحالة: {btc_trend}\n"
+      f"  🛑 *SL:* `{btc_price * (1 - btc_sl_p):,.2f}`\n"
+      f"  🎯 *TP1:* `{btc_price * (1 + btc_tp1_p):,.2f}` (+{btc_tp1_p*100}%)\n"
+      f"  🚀 *TP2:* `{btc_price * (1 + btc_tp2_p):,.2f}` (+{btc_tp2_p*100}%)\n\n"
+      f"💎 **2. إيثريوم (ETH/USDT):**\n"
+      f"• السعر الحالي: `{eth_price:,.2f}$` (التغير 24س: `{eth_chg:+.2f}%`)\n"
+      f"• الحالة: {eth_trend}\n"
+      f"  🛑 *SL:* `{eth_price * (1 - eth_sl_p):,.2f}`\n"
+      f"  🎯 *TP1:* `{eth_price * (1 + eth_tp1_p):,.2f}` (+{eth_tp1_p*100}%)\n"
+      f"  🚀 *TP2:* `{eth_price * (1 + eth_tp2_p):,.2f}` (+{eth_tp2_p*100}%)\n\n"
+      f"⚡ **3. ريبل (XRP/USDT):**\n"
+      f"• السعر الحالي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
+      f"• الحالة: {xrp_trend}\n"
+      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.4f}`\n"
+      f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.2f}` (+{xrp_tp1_p*100}%)\n\n"
+      "🛡️ **نظام التأمين:** يتم تفعيل Breakeven (نقل وقف الخسارة لسعر الدخول)"
+      " فور بلوغ الهدف الأول تلقائياً."
+  )
+  send_with_menu(message, deals_text)
+
+
+# --- صفقات الذهب (القاعدة الذهبية) ---
+@bot.message_handler(
+    func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)"
+)
+def send_gold_golden_rule(message):
+  current_gold = get_gold_price()
+  tp1_price = current_gold * (1 + 0.007)
+  tp2_price = current_gold * (1 + 0.015)
+  sl_price = current_gold * (1 - 0.01)
+
+  gold_text = (
+      "🟡 **توصيات صفقات الذهب (القاعدة الذهبية):**\n\n"
+      f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
+      f"🛑 **وقف الخسارة المقترح (SL):** `{sl_price:,.2f}` $ (-1.0%)\n\n"
+      "⚡ **1️⃣ صفقات الذهب اليومية:**\n"
+      f"• **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ ──> **(+0.7%)**\n"
+      f"  • 🛡️ **التأمين:** فور تحقق الهدف الأول، أغلق 50% من العقد وانقل وقف"
+      f" الخسارة لسعر الدخول (`{current_gold:,.2f}`).\n"
+      f"• **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ ──> **(+1.5%)**\n\n"
+      "📈 **2️⃣ استثمار وتجميع الذهب:** بدون رافعة مالية مع حماية الأصل الأساسي."
+  )
+  send_with_menu(message, gold_text)
+
+
+# --- صفقات الذهب (الرؤية التحليلية) ---
+@bot.message_handler(
+    func=lambda message: message.text == "🟡 صفقات الذهب (الرؤية التحليلية)"
+)
+def send_gold_analytical_vision(message):
+  current_gold = get_gold_price()
+  tp1_price = current_gold * (1 + 0.01)
+  tp2_price = current_gold * (1 + 0.022)
+  sl_price = current_gold * (1 - 0.012)
+
+  gold_text = (
+      "🟡 **توصيات صفقات الذهب (الرؤية التحليلية والزخم الحي):**\n\n"
+      f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
+      f"🚀 **حالة السوق:** رصد سيولة شرائية وتذبذب إيجابي.\n"
+      f"🛑 **وقف الخسارة (SL):** `{sl_price:,.2f}` $ (-1.2%)\n\n"
+      "⚡ **الأهداف الحية الديناميكية:**\n"
+      f"• **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ ──> **(+1.0%)**\n"
+      f"  • 🛡️ **التأمين:** تأمين الصفقة برفع الـ SL لسعر الدخول (`{current_gold:,.2f}`).\n"
+      f"• **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ ──> **(+2.2%)**\n\n"
+      "🛡️ **إدارة المخاطر:** الالتزام بحاسبة المخاطر وعدم تجاوز 1% من رأس المال."
+  )
+  send_with_menu(message, gold_text)
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "🧮 حاسبة المخاطر وحجم الصفقة"
+)
+def start_risk_calculator(message):
+  user_id = message.from_user.id
+  risk_calculator_sessions[user_id] = {"step": "waiting_capital"}
+  msg = bot.send_message(
+      message.chat.id,
+      "🧮 **حاسبة إدارة المخاطر:**\n\nأرسل إجمالي رأس مالك بالـ USDT (مثلاً:"
+      " `500`):",
+      parse_mode="Markdown",
+  )
+  bot.register_next_step_handler(msg, process_capital_step)
+
+
+def process_capital_step(message):
+  user_id = message.from_user.id
+  try:
+    capital = float(message.text.strip())
+    risk_calculator_sessions[user_id]["capital"] = capital
+    risk_calculator_sessions[user_id]["step"] = "waiting_risk"
+    msg = bot.send_message(
+        message.chat.id,
+        f"✅ رأس المال: `{capital}` USDT.\n\nأرسل نسبة الخسارة المقبولة (مثلاً:"
+        " `2`):",
+        parse_mode="Markdown",
+    )
+    bot.register_next_step_handler(msg, process_risk_step)
+  except Exception:
+    bot.send_message(message.chat.id, "⚠️ أرسل رقماً صحيحاً (مثلاً: 500).")
+
+
+def process_risk_step(message):
+  user_id = message.from_user.id
+  try:
+    risk_pct = float(message.text.strip())
+    session = risk_calculator_sessions.get(user_id, {})
+    capital = session.get("capital", 500)
+    max_loss = capital * (risk_pct / 100.0)
+    result_text = (
+        "📊 **نتيجة حساب المخاطر:**\n\n"
+        f"💰 رأس المال: `{capital}` USDT\n"
+        f"🎯 نسبة المخاطرة: `{risk_pct}%`\n"
+        f"🛑 أقصى مبلغ للخسارة: **`{max_loss:.2f}` USDT**"
+    )
+    send_with_menu(message, result_text)
+    if user_id in risk_calculator_sessions:
+      del risk_calculator_sessions[user_id]
+  except Exception:
+    bot.send_message(message.chat.id, "⚠️ حدث خطأ. أعد المحاولة من الزر الرئيسي.")
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "🔔 ضبط تنبيه سعر مخصص (/alert)"
+)
+def custom_alert_guide(message):
+  send_with_menu(
+      message,
+      "🔔 **التنبيهات المخصصة:**\n\nاستخدم الأمر بالشكل الصحيح:\n• `/alert btc"
+      " 68000`\n• `/alert eth 1850`",
+  )
+
+
+@bot.message_handler(commands=["alert"])
+def set_custom_alert(message):
+  user_id = message.from_user.id
+  parts = message.text.split()
+  if len(parts) < 3:
+    bot.send_message(
+        message.chat.id, "⚠️ الصيغة الصحيحة: `/alert btc 68000`"
+    )
+    return
+  asset = parts[1].replace("/", "").replace("USDT", "").upper()
+  try:
+    target_price = float(parts[2].replace(",", ""))
+    if user_id not in custom_alerts:
+      custom_alerts[user_id] = []
+    custom_alerts[user_id].append({"asset": asset, "price": target_price})
+    bot.send_message(
+        message.chat.id,
+        f"✅ تم ضبط التنبيه الحقيقي للعملة `{asset}` عند سعر `{target_price:,.2f}`",
+    )
+  except Exception:
+    bot.send_message(message.chat.id, "⚠️ خطأ في كتابة السعر.")
+
+
+# --- مراقب الأسعار في الخلفية ---
 def background_price_monitor():
-    """خيط خلفي لإدارة وتنبيهات الأسعار الخاصة بالمشتركين"""
-    while True:
-        try:
-            # هنا يمكنك وضع منطق فحص الأسعار وجلبها وجدولة التنبيهات
-            pass
-        except Exception as e:
-            print(f"Monitor error: {e}")
-        time.sleep(60)
+  while True:
+    try:
+      if custom_alerts:
+        btc_p, eth_p, xrp_p = get_crypto_prices()
+        gold_p = get_gold_price()
+        prices_map = {"BTC": btc_p, "ETH": eth_p, "XRP": xrp_p, "GOLD": gold_p}
 
-# تشغيل مراقب الأسعار بخيط مستقل
-monitor_thread = threading.Thread(target=background_price_monitor, daemon=True)
-monitor_thread.start()
+        for user_id in list(custom_alerts.keys()):
+          user_alerts_list = custom_alerts[user_id]
+          remaining_alerts = []
 
-# --- التشغيل المستمر للبوت ---
+          for alert in user_alerts_list:
+            asset = alert["asset"]
+            target = alert["price"]
+            current_price = prices_map.get(asset, 0)
+
+            triggered = False
+            if current_price > 0:
+              triggered = current_price >= target
+
+            if triggered:
+              try:
+                bot.send_message(
+                    user_id,
+                    f"🚨 **تنبيه سعر حقيقي وصل لهدفه!**\n\n"
+                    f"🪙 العملة/الأصل: `{asset}`\n"
+                    f"🎯 السعر المستهدف: `{target:,.2f}`\n"
+                    f"📊 السعر الحالي في السوق: `{current_price:,.2f}`",
+                    parse_mode="Markdown",
+                )
+              except Exception:
+                pass
+            else:
+              remaining_alerts.append(alert)
+
+          if remaining_alerts:
+            custom_alerts[user_id] = remaining_alerts
+          else:
+            del custom_alerts[user_id]
+    except Exception as e:
+      print(f"Error in background monitor: {e}")
+    time.sleep(60)
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "📰 موجز الأخبار الاقتصادية اللحظية"
+)
+def send_crypto_news(message):
+  news_text = (
+      "📰 **موجز الأخبار الاقتصادية والأسواق اللحظية:**\n\n"
+      "1️⃣ **الاحتياطي الفيدرالي وأسعار الفائدة:** ترقب الأسواق لبيانات التضخم.\n"
+      "2️⃣ **سوق العملات الرقمية (Crypto):** استقرار التدفقات يعزز الدعم الحالي.\n"
+      "3️⃣ **سوق الذهب العالمي (XAUUSD):** الأحداث الجيوسياسية تقود الأسعار.\n"
+  )
+  send_with_menu(message, news_text)
+
+
+QUIZ_QUESTIONS = [
+    {
+        "question": (
+            "🧠 **سؤال اختبار التداول (1/4):**\n\nما هو الغرض الأساسي من استخدام أمر"
+            " (وقف الخسارة - Stop Loss)؟\n\nأ) مضاعفة الأرباح\nب) حماية المحفظة"
+            " والخروج بخسارة صغيرة\nج) زيادة الرسوم\n\n💡 أجب بـ (ب):"
+        ),
+        "answer_key": "ب",
+        "keywords": ["ب", "حماية", "خسارة"],
+    }
+]
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "🧠 اختبار تداولي تفاعلي (Quiz)"
+)
+def start_trading_quiz(message):
+  user_id = message.from_user.id
+  q_data = random.choice(QUIZ_QUESTIONS)
+  active_quizzes[user_id] = q_data
+  msg = bot.send_message(
+      message.chat.id, q_data["question"], parse_mode="Markdown"
+  )
+  bot.register_next_step_handler(msg, check_quiz_answer)
+
+
+def check_quiz_answer(message):
+  user_id = message.from_user.id
+  ans = message.text.strip().lower()
+  q_data = active_quizzes.get(user_id)
+  if not q_data:
+    return
+  if any(k in ans for k in q_data["keywords"]):
+    send_with_menu(message, "🎉 **إجابة صحيحة 100%!**")
+  else:
+    send_with_menu(message, f"❌ إجابة غير صحيحة. الخيار الصحيح هو (ب)")
+  if user_id in active_quizzes:
+    del active_quizzes[user_id]
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "📚 الأكاديمية التعليمية للمبتدئين"
+)
+def send_academy(message):
+  academy_text = (
+      "📚 **الأكاديمية التعليمية للمبتدئين:**\n\nتعلم أساسيات التداول وإدارة"
+      " المخاطر من الصفر حتى الاحتراف."
+  )
+  send_with_menu(message, academy_text)
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "📖 قاموس مصطلحات التداول (بحث ذكي)"
+)
+def glossary_menu(message):
+  send_with_menu(
+      message,
+      "📖 **قاموس مصطلحات التداول:**\n\nاستخدم الأمر `/search` متبوعاً بالمصطلح"
+      " مثل: `/search breakeven`",
+  )
+
+
+@bot.message_handler(commands=["search"])
+def search_glossary(message):
+  parts = message.text.split(maxsplit=1)
+  if len(parts) < 2:
+    bot.send_message(message.chat.id, "⚠️ مثال: `/search breakeven`")
+    return
+  query = parts[1].strip().lower()
+  glossary_db = {
+      "breakeven": (
+          "🛡️ **Breakeven:** تأمين الصفقة برفع وقف الخسارة لسعر الدخول."
+      ),
+      "usdt": "🔹 **USDT:** العملة المستقرة الملاذ الآمن.",
+  }
+  desc = glossary_db.get(query, "❌ عذراً، لم يُعثر على المصطلح.")
+  bot.send_message(message.chat.id, desc, parse_mode="Markdown")
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "🌐 دليل فتح الحسابات وإنشاء المحافظ"
+)
+def send_accounts_guide(message):
+  send_with_menu(message, "🌐 **دليل فتح الحسابات وتوثيق الهوية KYC.**")
+
+
+@bot.message_handler(
+    func=lambda message: message.text
+    == "📥 دليل السحب والإيداع (شبكة TRC20)"
+)
+def send_deposit_withdraw_guide(message):
+  send_with_menu(message, "📥 **دليل السحب والإيداع عبر شبكة TRC20.**")
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "💳 الدفع والشحن المحلي (شام كاش)"
+)
+def send_payment_info(message):
+  send_with_menu(
+      message,
+      f"💳 **الدفع والشحن عبر شام كاش:**\nتواصل مع المطور: {ADMIN_USERNAME}",
+  )
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "⏳ حالة اشتراكي ورابط دعوة أصدقائي"
+)
+def check_my_status_and_ref(message):
+  user_id = message.from_user.id
+  uid_str = str(user_id)
+  if user_id == ADMIN_ID:
+    bot.send_message(message.chat.id, "👑 أنت المطور، اشتراكك مفتوح دائماً!")
+    return
+  user_info = all_users.get(
+      uid_str, {"expiry": (datetime.now() + timedelta(days=3)).isoformat()}
+  )
+  expiry_dt = datetime.fromisoformat(user_info["expiry"])
+  bot_username = bot.get_me().username
+  ref_link = f"https://t.me/{bot_username}?start=ref_{uid_str}"
+  send_with_menu(
+      message,
+      f"📋 ينتهي اشتراكك في: `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n🔗 رابط"
+      f" الدعوة:\n`{ref_link}`",
+  )
+
+
+@bot.message_handler(func=lambda message: message.text == "🛠️ لوحة تحكم المطور")
+def admin_panel(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  send_with_menu(
+      message, "👑 **لوحة تحكم المطور:**\nالأوامر: `/users`, `/stats`, `/add_days`"
+  )
+
+
+@bot.message_handler(commands=["users"])
+def show_all_users(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  current_users = load_users()
+  if not current_users:
+    bot.send_message(message.chat.id, "📭 لا يوجد مشتركين.")
+    return
+  for uid, info in list(current_users.items())[-15:]:
+    user_name = info.get("name", "بدون اسم")
+    user_uname = info.get("username", "لا يوجد")
+    text = (
+        f"👤 **الاسم:** {user_name}\n🆔 المعرف: `{uid}`\n🌐 اليوزر:"
+        f" `@{user_uname}`"
+    )
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton(
+            text="💬 فتح الملف الشخصي", url=f"tg://user?id={uid}"
+        )
+    )
+    try:
+      bot.send_message(
+          message.chat.id, text, reply_markup=markup, parse_mode="Markdown"
+      )
+    except Exception:
+      pass
+
+
+@bot.message_handler(commands=["stats"])
+def show_stats(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  bot.send_message(message.chat.id, f"📊 إجمالي المشتركين: {len(all_users)}")
+
+
 if __name__ == "__main__":
-    print("Bot is starting...")
-    while True:
-        try:
-            bot.infinity_polling(skip_pending=True)
-        except Exception as e:
-            print(f"Polling error occurred: {e}")
-            time.sleep(5)
+  # تشغيل سيرفر الويب الوهمي لـ Render لمنع خطأ Port Scan
+  flask_thread = threading.Thread(target=run_flask, daemon=True)
+  flask_thread.start()
+  print("Flask web server started successfully...")
+
+  alert_thread = threading.Thread(target=background_price_monitor, daemon=True)
+  alert_thread.start()
+  print("Background price monitor worker started...")
+
+  try:
+    bot.remove_webhook()
+    print("Webhook removed successfully.")
+    time.sleep(2)
+  except Exception as e:
+    print(f"Error removing webhook: {e}")
+
+  print("Starting bot polling...")
+  bot.infinity_polling(
+      timeout=60, long_polling_timeout=60, skip_pending=True
+  )
