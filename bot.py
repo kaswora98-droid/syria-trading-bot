@@ -30,6 +30,7 @@ ADMIN_USERNAME = "@alone123987"
 
 DATA_FILE = "users_data.json"
 GROUPS_FILE = "groups_data.json"
+RESULTS_FILE = "trading_results.json"  # ملف تخزين نتائج الصفقات الحقيقية
 banned_users = set()
 
 risk_calculator_sessions = {}
@@ -77,6 +78,28 @@ def save_groups(groups_list):
       json.dump(groups_list, f, ensure_ascii=False, indent=4)
   except Exception:
     pass
+
+
+# دوال حفظ واسترجاع نتائج الصفقات (يومي، أسبوعي، شهري)
+def load_results():
+  if os.path.exists(RESULTS_FILE):
+    try:
+      with open(RESULTS_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+        if not content.strip():
+          return {"daily": [], "weekly": [], "monthly": []}
+        return json.loads(content)
+    except Exception:
+      return {"daily": [], "weekly": [], "monthly": []}
+  return {"daily": [], "weekly": [], "monthly": []}
+
+
+def save_results(data):
+  try:
+    with open(RESULTS_FILE, "w", encoding="utf-8") as f:
+      json.dump(data, f, ensure_ascii=False, indent=4)
+  except Exception as e:
+    print(f"Error saving results: {e}")
 
 
 all_users = load_users()
@@ -218,7 +241,7 @@ def get_dynamic_deal_data(symbol_id, default_price):
   return default_price, 0.0, "⚖️ استقرار جانبي (Consolidation)", 0.01, 0.02, 0.01
 
 
-# --- القائمة الرئيسية مع الأزرار الكاملة (محدثة مع أزرار التحكم والعملات) ---
+# --- القائمة الرئيسية ---
 def get_main_menu(user_id):
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
@@ -228,9 +251,8 @@ def get_main_menu(user_id):
   btn_gold_golden = types.KeyboardButton("🟡 صفقات الذهب (القاعدة الذهبية)")
   btn_gold_analytical = types.KeyboardButton("🟡 صفقات الذهب (الرؤية التحليلية)")
   
-  # الميزة الأولى: إضافة أزرار أسهم رفع وتنزيل وترتيب الأوامر
-  btn_scroll_up = types.KeyboardButton("⬆️ رفع قائمة الأوامر للأعلى")
-  btn_scroll_down = types.KeyboardButton("⬇️ تنزيل قائمة الأوامر للأسفل")
+  # زر نتائج وأداء الصفقات المقترحة حقيقياً
+  btn_results = types.KeyboardButton("📈 نتائج وأداء الصفقات المقترحة (يومي/أسبوعي/شهري)")
 
   btn_calc = types.KeyboardButton("🧮 حاسبة المخاطر وحجم الصفقة")
   btn_alerts = types.KeyboardButton("🔔 ضبط تنبيه سعر مخصص (/alert)")
@@ -250,8 +272,7 @@ def get_main_menu(user_id):
         btn_analytical,
         btn_gold_golden,
         btn_gold_analytical,
-        btn_scroll_up,
-        btn_scroll_down,
+        btn_results,
         btn_calc,
         btn_alerts,
         btn_news,
@@ -270,8 +291,7 @@ def get_main_menu(user_id):
         btn_analytical,
         btn_gold_golden,
         btn_gold_analytical,
-        btn_scroll_up,
-        btn_scroll_down,
+        btn_results,
         btn_calc,
         btn_alerts,
         btn_news,
@@ -284,15 +304,6 @@ def get_main_menu(user_id):
         btn7,
     )
   return markup
-
-
-# معالجة أزرار أسهم الترتيب والرفع والتنزيل الجديدة
-@bot.message_handler(func=lambda message: message.text in ["⬆️ رفع قائمة الأوامر للأعلى", "⬇️ تنزيل قائمة الأوامر للأسفل"])
-def handle_scroll_buttons(message):
-  if "⬆️" in message.text:
-    send_with_menu(message, "⬆️ **تم رفع واجهة الأوامر وقائمتها للأعلى بنجاح.**\nاختر الأمر الذي تريده من القائمة أدناه:")
-  else:
-    send_with_menu(message, "⬇️ **تم تنزيل واجهة الأوامر وقائمتها للأسفل بنجاح.**\nاختر الأمر الذي تريده من القائمة أدناه:")
 
 
 @bot.message_handler(commands=["start"])
@@ -390,6 +401,71 @@ def send_with_menu(message, text):
   )
 
 
+# --- ميزة عرض نتائج الصفقات المقترحة (يومي، أسبوعي، شهري) حقيقياً ---
+@bot.message_handler(func=lambda message: message.text == "📈 نتائج وأداء الصفقات المقترحة (يومي/أسبوعي/شهري)")
+def show_trading_results_report(message):
+  results = load_results()
+  daily_list = results.get("daily", [])
+  weekly_list = results.get("weekly", [])
+  monthly_list = results.get("monthly", [])
+
+  def format_items(items):
+    if not items:
+      return "• لم يتم تسجيل نتائج لهذه الفترة بعد.\n"
+    res = ""
+    for item in items[-6:]:  # عرض آخر 6 صفقات أو نتائج مسجلة
+      res += f"  {item}\n"
+    return res
+
+  report_text = (
+      "📈 **سجل نتائج وأداء الصفقات المقترحة (شفافية السوق):**\n\n"
+      "📅 **1. النتائج اليومية (صفقات اليوم):**\n"
+      f"{format_items(daily_list)}\n"
+      "📊 **2. النتائج الأسبوعية (حصيلة الأسبوع):**\n"
+      f"{format_items(weekly_list)}\n"
+      "🏆 **3. النتائج الشهرية (الحصيلة الكبرى):**\n"
+      f"{format_items(monthly_list)}\n"
+      "💡 *ملاحظة:* يتم تحديث النتائج فور إغلاق الصفقة (حقيقية بربح ✅ أو خسارة ❌ أو تأمين 🛡️)."
+  )
+  send_with_menu(message, report_text)
+
+
+# أمر خاص للمطور لتسجيل نتيجة صفقة أو ملخص يومي/أسبوعي/شهري
+@bot.message_handler(commands=["add_result"])
+def add_trading_result_cmd(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  parts = message.text.split(maxsplit=2)
+  if len(parts) < 3:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ الصيغة الصحيحة للأمر:\n"
+        "`/add_result daily ✅ صفقة BTC ربح +1.5% (تحقيق TP1)`\n"
+        "`/add_result weekly 📊 حصيلة الأسبوع: 4 صفقات ناجحة و 1 صفقة خاسرة`\n"
+        "`/add_result monthly 🏆 حصيلة الشهر: أرباح إجمالية +14.2%`",
+        parse_mode="Markdown",
+    )
+    return
+
+  category = parts[1].strip().lower()
+  result_text = parts[2].strip()
+
+  results = load_results()
+  if category in ["daily", "weekly", "monthly"]:
+    results[category].append(result_text)
+    save_results(results)
+    bot.send_message(
+        message.chat.id,
+        f"✅ تم تسجيل وإضافة النتيجة بنجاح إلى قسم ({category}):\n`{result_text}`",
+        parse_mode="Markdown",
+    )
+  else:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ القسم غير صحيح. استخدم حصراً: `daily` أو `weekly` أو `monthly`.",
+    )
+
+
 @bot.message_handler(func=lambda message: message.text == "📊 صفقات القاعدة الذهبية للعملات")
 def send_golden_rule_deals(message):
   btc, eth, xrp = get_crypto_prices()
@@ -405,34 +481,33 @@ def send_golden_rule_deals(message):
   btc_sl = btc * (1 - 0.012)
   eth_sl = eth * (1 - 0.012)
 
-  # الميزة الثانية: فصل الإغلاق اللحظي الفوري عن إغلاق الشمعة (كاندل)
   deals_text = (
       "📊 **صفقات القاعدة الذهبية للعملات (النسب الثابتة وإدارة المخاطر - بالسعر الحي):**\n\n"
-      "⚡ **1. صفقات السكالبينج:**\n"
+      "⚡ **1. صفقات السكالبينج للعملات:**\n"
       f"• **العملة:** XRP/USDT (سعر الدخول: `{xrp:,.4f}`)\n"
       f"  🛑 *وقف الخسارة (SL):* `{xrp_sl:,.4f}` (-1.2%)\n"
       f"  🎯 *الهدف الأول (TP1):* `{xrp * 1.008:,.4f}` ──> **(+{xrp_tp1_pct}%)**\n"
       f"  🛡️ **التأمين:** جني 50% ونقل وقف الخسارة لسعر الدخول (`{xrp:,.4f}`).\n"
       f"  🚀 *الهدف الثاني (TP2):* `{xrp * 1.015:,.4f}` ──> **(+{xrp_tp2_pct}%)**\n"
-      f"  ⏱️ **نوع الإغلاق المعتمد:**\n"
+      f"  ⏱️ **نوع الإغلاق المعتمد للعملات:**\n"
       f"    • ⚡ *الإغلاق اللحظي الفوري:* للخروج المباشر عند ملامسة السعر للهدف بدقة.\n"
       f"    • 🕯️ *إغلاق الشمعة (Candle Close):* لتأكيد كسر المستوى وثبات الإغلاق الزمني.\n\n"
-      "📅 **2. الصفقات اليومية:**\n"
+      "📅 **2. الصفقات اليومية للعملات:**\n"
       f"• **العملة:** BTC/USDT (سعر الدخول: `{btc:,.2f}`)\n"
       f"  🛑 *وقف الخسارة (SL):* `{btc_sl:,.2f}` (-1.2%)\n"
       f"  🎯 *الهدف الأول (TP1):* `{btc * 1.012:,.2f}` ──> **(+{btc_tp1_pct}%)**\n"
       f"  🛡️ **التأمين:** جني نصف الربح وحرك وقف الخسارة لنقطة الدخول (`{btc:,.2f}`).\n"
       f"  🚀 *الهدف الثاني (TP2):* `{btc * 1.025:,.2f}` ──> **(+{btc_tp2_pct}%)**\n"
-      f"  ⏱️ **نوع الإغلاق المعتمد:**\n"
+      f"  ⏱️ **نوع الإغلاق المعتمد للعملات:**\n"
       f"    • ⚡ *الإغلاق اللحظي الفوري:* لتنفيذ أمر السوق الفوري.\n"
       f"    • 🕯️ *إغلاق الشمعة (Candle Close):* بانتظار إغلاق شمعة الـ 4 ساعات.\n\n"
-      "🌊 **3. صفقات السوينغ:**\n"
+      "🌊 **3. صفقات السوينغ للعملات:**\n"
       f"• **العملة:** ETH/USDT (سعر الدخول: `{eth:,.2f}`)\n"
       f"  🛑 *وقف الخسارة (SL):* `{eth_sl:,.2f}` (-1.2%)\n"
       f"  🎯 *الهدف الأول (TP1):* `{eth * 1.03:,.2f}` ──> **(+{eth_tp1_pct}%)**\n"
       f"  🛡️ **التأمين:** تأمين الصفقة عند الدخول (`{eth:,.2f}`).\n"
       f"  🚀 *الهدف الثاني (TP2):* `{eth * 1.06:,.2f}` ──> **(+{eth_tp2_pct}%)**\n"
-      f"  ⏱️ **نوع الإغلاق المعتمد:**\n"
+      f"  ⏱️ **نوع الإغلاق المعتمد للعملات:**\n"
       f"    • ⚡ *الإغلاق اللحظي الفوري:* عند ضرب الهدف بالمللي.\n"
       f"    • 🕯️ *إغلاق الشمعة (Candle Close):* إغلاق شمعة اليومي لتأكيد الاتجاه.\n\n"
       "🏛️ **4. الاستثمار طويل الأمد (DCA + حماية الأصل):**\n"
@@ -469,20 +544,20 @@ def send_analytical_vision_deals(message):
       f"  🛑 *SL:* `{btc_price * (1 - btc_sl_p):,.2f}`\n"
       f"  🎯 *TP1:* `{btc_price * (1 + btc_tp1_p):,.2f}` (+{btc_tp1_p*100}%)\n"
       f"  🚀 *TP2:* `{btc_price * (1 + btc_tp2_p):,.2f}` (+{btc_tp2_p*100}%)\n"
-      f"  ⏱️ *الإغلاق:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
+      f"  ⏱️ *الإغلاق للعملات:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
       f"💎 **2. إيثريوم (ETH/USDT):**\n"
       f"• السعر الحالي: `{eth_price:,.2f}$` (التغير 24س: `{eth_chg:+.2f}%`)\n"
       f"• الحالة: {eth_trend}\n"
       f"  🛑 *SL:* `{eth_price * (1 - eth_sl_p):,.2f}`\n"
       f"  🎯 *TP1:* `{eth_price * (1 + eth_tp1_p):,.2f}` (+{eth_tp1_p*100}%)\n"
       f"  🚀 *TP2:* `{eth_price * (1 + eth_tp2_p):,.2f}` (+{eth_tp2_p*100}%)\n"
-      f"  ⏱️ *الإغلاق:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
+      f"  ⏱️ *الإغلاق للعملات:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
       f"⚡ **3. ريبل (XRP/USDT):**\n"
       f"• السعر الحالي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
       f"• الحالة: {xrp_trend}\n"
-      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.4f}`\n"
+      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.2f}`\n"
       f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.2f}` (+{xrp_tp1_p*100}%)\n"
-      f"  ⏱️ *الإغلاق:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
+      f"  ⏱️ *الإغلاق للعملات:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
       "🛡️ **نظام التأمين:** يتم تفعيل Breakeven (نقل وقف الخسارة لسعر الدخول) فور بلوغ الهدف الأول تلقائياً."
   )
   send_with_menu(message, deals_text)
@@ -967,7 +1042,13 @@ def admin_panel(message):
     return
   send_with_menu(
       message,
-      "👑 **لوحة تحكم المطور:**\nالأوامر: `/users`, `/stats`, `/add_days ID days`, `/ban ID`",
+      "👑 **لوحة تحكم المطور:**\n"
+      "الأوامر المتاحة:\n"
+      "• `/users` - عرض المشتركين\n"
+      "• `/stats` - الإحصائيات\n"
+      "• `/add_result daily [النص]` - تسجيل نتيجة صفقة يومية\n"
+      "• `/add_result weekly [النص]` - تسجيل حصيلة أسبوعية\n"
+      "• `/add_result monthly [النص]` - تسجيل حصيلة شهرية",
   )
 
 
