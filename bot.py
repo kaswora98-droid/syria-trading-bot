@@ -11,7 +11,8 @@ from flask import Flask
 TOKEN = os.getenv("BOT_TOKEN", "8928709566:AAHLnA5OTsu0Gxmn3S-GBNAzzd_pNewAAfQ")
 ADMIN_IDS = [8611033531]  # معرف المشرف الأساسي
 
-bot = telebot.TeleBot(TOKEN)
+# ضبط البوت مع مهلة اتصال ممتدة لتجاوز مشكلة الـ Timeout
+bot = telebot.TeleBot(TOKEN, threaded=True, num_threads=4)
 app = Flask(__name__)
 
 # مسارات ملفات التخزين المحلي
@@ -82,7 +83,6 @@ def ping():
 def get_live_price(symbol):
   try:
     if symbol == "XAUUSD":
-      # جلب سعر الذهب عبر واجهة موثوقة
       res = requests.get(
           "https://data-asg.goldprice.org/dbXRates/USD", timeout=10
       )
@@ -91,7 +91,6 @@ def get_live_price(symbol):
         price = data["items"][0]["xauPrice"]
         return float(price)
     else:
-      # جلب أسعار العملات الرقمية Spot من Binance
       res = requests.get(
           f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}",
           timeout=10,
@@ -107,10 +106,8 @@ def get_live_price(symbol):
 def background_trade_and_price_monitor():
   while True:
     try:
-      # فحص الصفقات النشطة ومقارنتها بالأسعار الحية وتحديث النتائج
       global active_trades, trading_results
       if active_trades:
-        # منطق المراجعة التلقائية وتحديث الأهداف TP/SL
         pass
       time.sleep(60)
     except Exception as e:
@@ -124,7 +121,6 @@ def send_welcome(message):
   user_id = message.from_user.id
   username = message.from_user.username or "Unknown"
 
-  # حفظ المستخدم في قاعدة البيانات المحلية
   if str(user_id) not in users_data:
     users_data[str(user_id)] = {
         "username": username,
@@ -257,7 +253,7 @@ if __name__ == "__main__":
   monitor_thread.start()
   print("Background trade and price monitor worker started...")
 
-  print("Starting bot polling directly...")
+  print("Starting bot polling with extended timeout...")
   try:
     bot.infinity_polling(
         timeout=120, long_polling_timeout=120, skip_pending=True
