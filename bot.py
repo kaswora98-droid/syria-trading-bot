@@ -33,7 +33,7 @@ active_quizzes = {}
 app = Flask(__name__)
 
 
-# --- دوال حفظ واسترجاع البيانات ---
+# --- دوال حفظ واسترجاع البيانات مع الحماية الجذرية ---
 def load_users():
   if os.path.exists(DATA_FILE):
     try:
@@ -77,7 +77,6 @@ all_users = load_users()
 active_groups = load_groups()
 
 
-# --- مسارات سيرفر الويب لترضاء منصة Render ---
 @app.route("/")
 def home():
   return "Ultimate Trading Bot is running 24/7!"
@@ -198,7 +197,7 @@ def get_dynamic_deal_data(symbol_id, default_price):
   return default_price, 0.0, "⚖️ استقرار جانبي (Consolidation)", 0.01, 0.02, 0.01
 
 
-# --- القائمة الرئيسية ---
+# --- القائمة الرئيسية مع الأزرار الكاملة ---
 def get_main_menu(user_id):
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
@@ -601,7 +600,8 @@ def background_price_monitor():
                     f"🚨 **تنبيه سعر حقيقي وصل لهدفه!**\n\n"
                     f"🪙 العملة/الأصل: `{asset}`\n"
                     f"🎯 السعر المستهدف: `{target:,.2f}`\n"
-                    f"📊 السعر الحالي في السوق: `{current_price:,.2f}`",
+                    f"📊 السعر الحالي في السوق: `{current_price:,.2f}`\n\n"
+                    f"⚡ حان الوقت لمراجعة الشارت واتخاذ القرار المناسب.",
                     parse_mode="Markdown",
                 )
               except Exception:
@@ -624,9 +624,17 @@ def background_price_monitor():
 def send_crypto_news(message):
   news_text = (
       "📰 **موجز الأخبار الاقتصادية والأسواق اللحظية:**\n\n"
-      "1️⃣ **الاحتياطي الفيدرالي وأسعار الفائدة:** ترقب الأسواق لبيانات التضخم.\n"
-      "2️⃣ **سوق العملات الرقمية (Crypto):** استقرار التدفقات يعزز الدعم الحالي.\n"
-      "3️⃣ **سوق الذهب العالمي (XAUUSD):** الأحداث الجيوسياسية تقود الأسعار.\n"
+      "1️⃣ **الاحتياطي الفيدرالي وأسعار الفائدة:**\n"
+      "• ترقب الأسواق لبيانات التضخم الأمريكية القادمة وتأثيرها المباشر على"
+      " قرارات الفيدرالي وحركة الذهب والعملات.\n\n"
+      "2️⃣ **سوق العملات الرقمية (Crypto):**\n"
+      "• استقرار تدفقات صناديق الاستثمار المتداولة (ETFs) يعزز مناطق الدعم"
+      " الحالية للبيتكوين.\n\n"
+      "3️⃣ **سوق الذهب العالمي (XAUUSD):**\n"
+      "• الأحداث الجيوسياسية وتحركات الدولار تقود أسعار الذهب نحو مستويات"
+      " قياسية جديدة.\n\n"
+      "💡 *نصيحة المطور:* لا تفتح صفقات كبرى أثناء صدور الأخبار الاقتصادية"
+      " الحساسة لتجنب الانزلاق السعري المفاجئ."
   )
   send_with_menu(message, news_text)
 
@@ -635,12 +643,43 @@ QUIZ_QUESTIONS = [
     {
         "question": (
             "🧠 **سؤال اختبار التداول (1/4):**\n\nما هو الغرض الأساسي من استخدام أمر"
-            " (وقف الخسارة - Stop Loss)؟\n\nأ) مضاعفة الأرباح\nب) حماية المحفظة"
-            " والخروج بخسارة صغيرة\nج) زيادة الرسوم\n\n💡 أجب بـ (ب):"
+            " (وقف الخسارة - Stop Loss)؟\n\nأ) مضاعفة الأرباح 10 أضعاف\nب) حماية"
+            " المحفظة والخروج بخسارة صغيرة عند انعكاس السوق\nج) زيادة رسوم التداول في"
+            " المنصة\n\n💡 أجب بـ (ب) أو اكتب الخيار الصحيح:"
         ),
         "answer_key": "ب",
         "keywords": ["ب", "حماية", "خسارة"],
-    }
+    },
+    {
+        "question": (
+            "🧠 **سؤال اختبار التداول (2/4):**\n\nماذا تعني العملة الرقمية (USDT)"
+            " في عالم التداول؟\n\nأ) عملة رقمية متذبذبة ترتفع وتنهبط بعنف\nب)"
+            " عملة مستقرة تساوي دولاراً واحداً دائماً لحفظ الأرباح\nج) عملة مخصصة"
+            " لتعدين البيتكوين فقط\n\n💡 أجب بـ (ب) أو اكتب الخيار الصحيح:"
+        ),
+        "answer_key": "ب",
+        "keywords": ["ب", "مستقرة", "دولار"],
+    },
+    {
+        "question": (
+            "🧠 **سؤال اختبار التداول (3/4):**\n\nما هي النسبة الآمنة الموصى"
+            " بالمخاطرة بها في الصفقة الواحدة للمبتدئين؟\n\nأ) من 50% إلى 100% من"
+            " رأس المال\nب) من 1% إلى 2% فقط للحفاظ على المحفظة\nج) لا داعي لحساب"
+            " نسب المخاطرة\n\n💡 أجب بـ (ب) أو اكتب الخيار الصحيح:"
+        ),
+        "answer_key": "ب",
+        "keywords": ["ب", "1%", "2%", "واحد", "اثنان"],
+    },
+    {
+        "question": (
+            "🧠 **سؤال اختبار التداول (4/4):**\n\nما هو سوق (السبوت - Spot) في"
+            " التداول؟\n\nأ) شراء الأصول وامتلاكها حقيقةً بدون رافعة مالية\nب)"
+            " الاقتراض والاستدانة بمضاعفات ضخمة\nج) التداول العشوائي بدون تحليل\n\n💡"
+            " أجب بـ (أ) أو اكتب الخيار الصحيح:"
+        ),
+        "answer_key": "أ",
+        "keywords": ["أ", "شراء", "امتلاك", "بدون"],
+    },
 ]
 
 
@@ -664,9 +703,16 @@ def check_quiz_answer(message):
   if not q_data:
     return
   if any(k in ans for k in q_data["keywords"]):
-    send_with_menu(message, "🎉 **إجابة صحيحة 100%!**")
+    send_with_menu(
+        message,
+        "🎉 **إجابة صحيحة 100% بارك الله فيك!**\nأنت تملك عقليّة متداول واعي"
+        " يعرف كيف يحمي أمواله.",
+    )
   else:
-    send_with_menu(message, f"❌ إجابة غير صحيحة. الخيار الصحيح هو (ب)")
+    send_with_menu(
+        message,
+        f"❌ إجابة غير صحيحة.\nالخيار الصحيح هو **({q_data['answer_key']})**.",
+    )
   if user_id in active_quizzes:
     del active_quizzes[user_id]
 
@@ -676,8 +722,29 @@ def check_quiz_answer(message):
 )
 def send_academy(message):
   academy_text = (
-      "📚 **الأكاديمية التعليمية للمبتدئين:**\n\nتعلم أساسيات التداول وإدارة"
-      " المخاطر من الصفر حتى الاحتراف."
+      "📚 **الأكاديمية التعليمية - تعلم التداول من الصفر حتى الاحتراف:**\n\n"
+      "🟢 **الدرس الأول (ما هو التداول؟):**\n"
+      "• هو عملية بيع وشراء الأصول الرقمية (مثل العملات أو الذهب) للاستفادة"
+      " من فرق السعر.\n"
+      "• يتم قياس وتسعير الأصول دائماً مقابل العملة المستقرة والدولار الرقمي"
+      " (`USDT`).\n\n"
+      "🟡 **الدرس الثاني (فهم أنواع الصفقات وتأمينها):**\n"
+      "• تنقسم الصفقات إلى سريعة جداً (سكالبينج)، يومية، متوسطة الأمد (سوينغ)، أو"
+      " استثمار طويل الأمد (DCA).\n"
+      "• احرص دائماً على تطبيق **قاعدة التأمين (Breakeven)** برفع وقف الخسارة"
+      " لسعر الدخول بعد بلوغ الهدف الأول.\n\n"
+      "🔵 **الدرس الثالث (إدارة المخاطر وحماية رأس المال):**\n"
+      "• القاعدة الذهبية: **لا تضع كل البيض في سلة واحدة.**\n"
+      "• لا تستخدم كل أموالك في صفقة واحدة أبداً، واجعل خسارة أي صفقة لا تتجاوز"
+      " 1% إلى 2% من إجمالي مالك.\n\n"
+      "🟣 **الدرس الرابع (حماية الأصول في الاستثمار طويل الأمد):**\n"
+      "• عند جني الأرباح في استراتيجيات DCA الصاعدة، يتم بيع جزء من الأرباح"
+      " الصافية فقط وتحويله لـ USDT مع **الحفاظ على كمية البيتكوين الأساسية كاملة"
+      " دون تآكل**.\n\n"
+      "🟠 **الدرس الخامس (السيطرة على المشاعر):**\n"
+      "• أكبر عدو للمتداول هو (الطمع) و(الخوف) والرغبة في الانتقام من السوق بعد"
+      " صفقة خاسرة.\n"
+      "• الالتزام بالخطة هو طريقك الوحيد للنجاح المستدام."
   )
   send_with_menu(message, academy_text)
 
@@ -686,35 +753,144 @@ def send_academy(message):
     func=lambda message: message.text == "📖 قاموس مصطلحات التداول (بحث ذكي)"
 )
 def glossary_menu(message):
-  send_with_menu(
-      message,
-      "📖 **قاموس مصطلحات التداول:**\n\nاستخدم الأمر `/search` متبوعاً بالمصطلح"
-      " مثل: `/search breakeven`",
+  glossary_guide = (
+      "📖 **قاموس الحيتان ومصطلحات السوق العتيقة:**\n\n"
+      "لتحترف لغة الكبار، استخدم الأمر `/search` متبوعاً بالكلمة التي تقصدها.\n"
+      "📌 *مثال:* `/search breakeven` أو `/search OCO` أو `/search USDT`\n\n"
+      "---\n"
+      "**فهرس المصطلحات المتاحة في الديوان:**\n"
+      "1️⃣ **USDT** (الملاذ الآمن المستقر)\n"
+      "2️⃣ **Breakeven** (تأمين الصفقة / نقطة التعادل)\n"
+      "3️⃣ **Scalping** (اقتناص الفتات السريع)\n"
+      "4️⃣ **TP / Take Profit** (مرفأ جني الأرباح)\n"
+      "5️⃣ **SL / Stop Loss** (طوق النجاة / وقف الخسارة)\n"
+      "6️⃣ **OCO** (الحارس المزدوج للأوامر)\n"
+      "7️⃣ **Leverage** (أداة الانتحار / الرافعة المالية)\n"
+      "8️⃣ **KYC** (بصمة الهوية المشروطة)\n"
+      "9️⃣ **DCA** (التجميع الهادئ المستمر)"
   )
+  send_with_menu(message, glossary_guide)
 
 
 @bot.message_handler(commands=["search"])
 def search_glossary(message):
   parts = message.text.split(maxsplit=1)
   if len(parts) < 2:
-    bot.send_message(message.chat.id, "⚠️ مثال: `/search breakeven`")
+    bot.send_message(
+        message.chat.id,
+        "⚠️ يرجى كتابة المصطلح بعد الأمر.\n*مثال:* `/search breakeven`",
+        parse_mode="Markdown",
+    )
     return
+
   query = parts[1].strip().lower()
+  if query == "oso":
+    query = "oco"
+
   glossary_db = {
-      "breakeven": (
-          "🛡️ **Breakeven:** تأمين الصفقة برفع وقف الخسارة لسعر الدخول."
+      "usdt": (
+          "🔹 **USDT (الملاذ الآمن المستقر):**\n"
+          "عملة رقمية مشفرة ثابتة القيمة تساوي دولاراً أمريكياً واحداً دائماً.\n"
+          "💡 *فائدتها:* تستخدم لحفظ الأرباح والهرب من هبوط السوق دون الحاجة لتحويل"
+          " الأموال لكاش ورقي."
       ),
-      "usdt": "🔹 **USDT:** العملة المستقرة الملاذ الآمن.",
+      "breakeven": (
+          "🛡️ **Breakeven (تأمين الصفقة / نقطة التعادل):**\n"
+          "إجراء وقائي يقوم به المتداول المحترف بعد تحرك السعر في صالحه وتحقيق"
+          " الهدف الأول (TP1)، وذلك بجني نصف الربح ونقل أمر وقف الخسارة (SL) إلى"
+          " سعر الدخول تماماً.\n"
+          "💡 *النتيجة:* تضمن عدم خسارة أي سنت من رأس مالك حتى لو انعكس السوق"
+          " فجأة!"
+      ),
+      "scalping": (
+          "⚡ **Scalping (اقتناص الفتات السريع):**\n"
+          "صفقات سريعة جداً تخطف أرباحاً صغيرة (مثل 1% أو 1.5%) خلال دقائق معدودة"
+          " وتُغلق فوراً."
+      ),
+      "tp": (
+          "🎯 **TP / Take Profit (مرفأ جني الأرباح):**\n"
+          "السعر المحدد مسبقاً الذي يأخذ عنده البوت أو المنصة أرباحك تلقائياً ويغلق"
+          " الصفقة."
+      ),
+      "sl": (
+          "🛑 **SL / Stop Loss (طوق النجاة / وقف الخسارة):**\n"
+          "السعر الذي يحمي محفظتك ويخرجك بخسارة صغيرة جداً ومحدودة إذا عكس السوق"
+          " اتجاهه."
+      ),
+      "oco": (
+          "🟣 **OCO (الحارس المزدوج للأوامر):**\n"
+          "وضع هدف الربح (TP) ووقف الخسارة (SL) معاً في نفس اللحظة، بحيث إذا تحقق"
+          " أحدهما يُلغى الآخر تلقائياً لتنام مرتاح البال."
+      ),
+      "leverage": (
+          "⚖️ **Leverage (أداة الانتحار / الرافعة المالية):**\n"
+          "استدانة أموال من المنصة لمضاعفة حجم الصفقة والأرباح (وتعظيم الخسائر"
+          " أيضاً). ⚠️ *ننصح المبتدئين بالابتعاد عنها والالتزام بالسبوت فقط.*"
+      ),
+      "kyc": (
+          "🆔 **KYC (بصمة الهوية المشروطة):**\n"
+          "توثيق الهوية الرسمية عبر إرسال صور الأوراق الثبوتية للمنصة لفتح صلاحيات"
+          " السحب والإيداع بأمان تام."
+      ),
+      "dca": (
+          "🏛️ **DCA (التجميع الهادئ المستمر):**\n"
+          "استراتيجية شراء الأصل (مثل البيتكوين) بمبالغ ثابتة على فترات منتظمة بغض"
+          " النظر عن السعر، مع جني جزء من الأرباح الصافية فقط والحفاظ على كمية"
+          " الأصل كاملة."
+      ),
+      "bull": (
+          "🐂 **Bull Market (سوق الثيران):**\n"
+          "سوق صاعد وإيجابي تسوده حالة التفاؤل وارتفاع الأسعار على المدى الطويل."
+      ),
+      "bear": (
+          "🐻 **Bear Market (سوق الدببة):**\n"
+          "سوق هابط وسلبي تسوده المخاوف وانخفاض الأسعار، ويحتاج إلى صبر واستراتيجيات"
+          " تجميع."
+      ),
   }
-  desc = glossary_db.get(query, "❌ عذراً، لم يُعثر على المصطلح.")
-  bot.send_message(message.chat.id, desc, parse_mode="Markdown")
+
+  found = False
+  for key, desc in glossary_db.items():
+    if query in key or query in desc.lower():
+      bot.send_message(
+          message.chat.id,
+          f"🔍 **نتيجة البحث في الديوان عن (`{query}`):**\n\n{desc}",
+          parse_mode="Markdown",
+      )
+      found = True
+      break
+
+  if not found:
+    bot.send_message(
+        message.chat.id,
+        f"❌ عذراً، لم نجد مصطلحاً يطابق (`{query}`). جرب بحثاً آخر مثل:"
+        " `breakeven`, `usdt`, `tp`, `sl`, `oco`.",
+        parse_mode="Markdown",
+    )
 
 
 @bot.message_handler(
     func=lambda message: message.text == "🌐 دليل فتح الحسابات وإنشاء المحافظ"
 )
 def send_accounts_guide(message):
-  send_with_menu(message, "🌐 **دليل فتح الحسابات وتوثيق الهوية KYC.**")
+  accounts_text = (
+      "🌐 **دليل فتح الحسابات وإنشاء المحافظ (الخطوة الأولى للاحتراف):**\n\n"
+      "🏛️ **1. منصات التداول المركزية (مثل Binance أو Bybit):**\n"
+      "• هي البورصة الكبرى التي ستشتري وتبيع من خلالها العملات الرقمية والذهب وتنفذ"
+      " الصفقات.\n"
+      "• **طريقة التسجيل:** تحميل التطبيق الرسمي من المتجر، التسجيل عبر البريد"
+      " الإلكتروني، وإنشاء كلمة مرور قوية.\n"
+      "• **توثيق الهوية (KYC):** ضروري جداً لحماية حسابك وسحب أرباحك بأمان، ويتم"
+      " عبر رفع صورة جواز السفر أو الهوية الشخصية.\n\n"
+      "👛 **2. المحافظ اللامركزية (مثل Trust Wallet أو MetaMask):**\n"
+      "• هي محفظتك الخاصة لتخزين أصولك بشكل بعيد عن المنصات وتحت سيطرتك الكاملة.\n"
+      "• **قاعدة الأمان الذهبية:** عند إنشاء المحفظة سيعطيك التطبيق (12 كلمة"
+      " سرية)، احفظهم في مكان آمن ورقي بعيداً عن الإنترنت ولا تعطهم لأي شخص نهائياً"
+      " لأن من يملكهم يملك أموالك.\n\n"
+      "💡 *نصيحة المطور:* ابدأ دائماً بتوثيق حسابك على إحدى المنصات الموثوقة،"
+      " وتعلّم ببطء وثبات قبل ضخ أي أموال حقيقية."
+  )
+  send_with_menu(message, accounts_text)
 
 
 @bot.message_handler(
@@ -722,17 +898,49 @@ def send_accounts_guide(message):
     == "📥 دليل السحب والإيداع (شبكة TRC20)"
 )
 def send_deposit_withdraw_guide(message):
-  send_with_menu(message, "📥 **دليل السحب والإيداع عبر شبكة TRC20.**")
+  deposit_withdraw_text = (
+      "📥 **دليل الإيداع والسحب (الطريق الآمن لأموالك):**\n\n"
+      "🌐 **1. لماذا نعتمد شبكة TRC20 تحديداً؟**\n"
+      "• هي الشبكة الأكثر استخداماً وأماناً للتحويلات الرقمية لعملة `USDT`.\n"
+      "• تتميز بسرعتها الفائقة في وصول الأموال (لا تتجاوز بضع دقائق).\n"
+      "• رسوم التحويل فيها ثابتة ورخيصة جداً (1 دولار فقط بغض النظر عن حجم"
+      " الحوالة).\n"
+      "• ⚠️ **تنبيه هام:** تأكد دائماً عند السحب أو الإيداع من اختيار شبكة"
+      " **TRC20 (Tron)** حصرياً لكي لا تضيع أموالك في شبكة خاطئة.\n\n"
+      "🔄 **2. آلية الإيداع والشحن (عبر الوكلاء وشام كاش):**\n"
+      "• لتحويل أموالك المحلية إلى رصيد رقمي `USDT` في منصتك، تتواصل مع الوكيل"
+      " المعتمد وتتم عملية التحويل بالليرة السورية عبر تطبيق **شام كاش**.\n"
+      "• يقوم الوكيل فوراً بإرسال ما يقابلها من عملات مستقرة إلى عنوان محفظتك"
+      " الرقمية.\n\n"
+      "💵 **3. آلية سحب الأرباح (كاش أو محفظة محلية):**\n"
+      "• عندما ترغب بسحب أرباحك، تقوم بتحويل الـ `USDT` من منصتك إلى عنوان"
+      " محفظة الوكيل.\n"
+      "• يستلم الوكيل العملات ويقوم بتسليمك المبلغ نقداً أو تحويله إلى حسابك على"
+      " شام كاش بكل سهولة وأمان."
+  )
+  send_with_menu(message, deposit_withdraw_text)
 
 
 @bot.message_handler(
     func=lambda message: message.text == "💳 الدفع والشحن المحلي (شام كاش)"
 )
 def send_payment_info(message):
-  send_with_menu(
-      message,
-      f"💳 **الدفع والشحن عبر شام كاش:**\nتواصل مع المطور: {ADMIN_USERNAME}",
+  payment_text = (
+      "💳 **معلومات الدفع والشحن عبر محفظة (شام كاش):**\n\n"
+      "تعتبر محفظة **شام كاش** الوسيلة المحلية الأسهل والأسرع لإتمام المعاملات"
+      " المالية وتفعيل الاشتراكات أو شحن الرصيد في سوريا.\n\n"
+      "📌 **خطوات إتمام الدفع أو الشحن بنجاح:**\n"
+      "  1️⃣ تواصل حصرياً مع المطور أو الوكيل المعتمد عبر المعرف الرسمي (`"
+      + ADMIN_USERNAME
+      + "` لتأكيد تفاصيل الحوالة).\n"
+      "  2️⃣ قم بإتمام عملية التحويل بالليرة السورية عبر تطبيق شام كاش إلى الحساب"
+      " المعتمد.\n"
+      "  3️⃣ أرسل صورة إيصال التحويل (الوصل) مع رقم حسابك التعريفي (`ID`) داخل"
+      " البوت للإدارة.\n"
+      "  4️⃣ سيقوم النظام أو الإدارة بمراجعة الحوالة وتفعيل اشتراكك أو رصيدك"
+      " فورياً خلال دقائق معدودة!"
   )
+  send_with_menu(message, payment_text)
 
 
 @bot.message_handler(
@@ -745,15 +953,21 @@ def check_my_status_and_ref(message):
     bot.send_message(message.chat.id, "👑 أنت المطور، اشتراكك مفتوح دائماً!")
     return
   user_info = all_users.get(
-      uid_str, {"expiry": (datetime.now() + timedelta(days=3)).isoformat()}
+      uid_str,
+      {
+          "expiry": (datetime.now() + timedelta(days=3)).isoformat(),
+          "referral_count": 0,
+      },
   )
   expiry_dt = datetime.fromisoformat(user_info["expiry"])
+  remaining = expiry_dt - datetime.now()
+  ref_count = user_info.get("referral_count", 0)
   bot_username = bot.get_me().username
   ref_link = f"https://t.me/{bot_username}?start=ref_{uid_str}"
   send_with_menu(
       message,
-      f"📋 ينتهي اشتراكك في: `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n🔗 رابط"
-      f" الدعوة:\n`{ref_link}`",
+      f"📋 ينتهي اشتراكك في: `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n👥 عدد"
+      f" أصدقائي: **{ref_count}**\n🔗 رابط الدعوة:\n`{ref_link}`",
   )
 
 
@@ -762,7 +976,9 @@ def admin_panel(message):
   if message.from_user.id != ADMIN_ID:
     return
   send_with_menu(
-      message, "👑 **لوحة تحكم المطور:**\nالأوامر: `/users`, `/stats`, `/add_days`"
+      message,
+      "👑 **لوحة تحكم المطور:**\nالأوامر: `/users`, `/stats`, `/add_days ID"
+      " days`, `/ban ID`",
   )
 
 
@@ -770,23 +986,37 @@ def admin_panel(message):
 def show_all_users(message):
   if message.from_user.id != ADMIN_ID:
     return
+
   current_users = load_users()
+
   if not current_users:
-    bot.send_message(message.chat.id, "📭 لا يوجد مشتركين.")
+    bot.send_message(message.chat.id, "📭 لا يوجد مشتركين في القاعدة حتى الآن.")
     return
+
+  bot.send_message(
+      message.chat.id,
+      f"👥 **قائمة المشتركين المسجلين (الإجمالي: {len(current_users)}):**",
+      parse_mode="Markdown",
+  )
+
   for uid, info in list(current_users.items())[-15:]:
     user_name = info.get("name", "بدون اسم")
     user_uname = info.get("username", "لا يوجد")
+    expiry_date = info.get("expiry", "")[:10]
+
     text = (
-        f"👤 **الاسم:** {user_name}\n🆔 المعرف: `{uid}`\n🌐 اليوزر:"
-        f" `@{user_uname}`"
+        f"👤 **الاسم:** {user_name}\n"
+        f"🆔 المعرف: `{uid}`\n"
+        f"🌐 اليوزر: `@{user_uname}`\n"
+        f"⏳ ينتهي في: `{expiry_date}`"
     )
+
     markup = types.InlineKeyboardMarkup()
-    markup.add(
-        types.InlineKeyboardButton(
-            text="💬 فتح الملف الشخصي", url=f"tg://user?id={uid}"
-        )
+    profile_btn = types.InlineKeyboardButton(
+        text="💬 فتح الملف الشخصي", url=f"tg://user?id={uid}"
     )
+    markup.add(profile_btn)
+
     try:
       bot.send_message(
           message.chat.id, text, reply_markup=markup, parse_mode="Markdown"
@@ -799,18 +1029,21 @@ def show_all_users(message):
 def show_stats(message):
   if message.from_user.id != ADMIN_ID:
     return
-  bot.send_message(message.chat.id, f"📊 إجمالي المشتركين: {len(all_users)}")
+  bot.send_message(
+      message.chat.id,
+      f"📊 إجمالي المشتركين: {len(all_users)}\nمجموعات مفعلة:"
+      f" {len(active_groups)}",
+  )
 
 
 if __name__ == "__main__":
-  # تشغيل سيرفر الويب في خيط مستقل فوري لتلبية متطلبات Render Web Service
   def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port, use_reloader=False)
 
   flask_thread = threading.Thread(target=run_flask, daemon=True)
   flask_thread.start()
-  print("Flask web server started immediately...")
+  print("Flask web server started successfully...")
 
   alert_thread = threading.Thread(target=background_price_monitor, daemon=True)
   alert_thread.start()
