@@ -7,8 +7,8 @@ import telebot
 from telebot import types
 from flask import Flask
 
-# إعدادات التوكن وصلاحيات المشرف
-TOKEN = os.getenv("BOT_TOKEN", "7407026857:AAH0mPoxUv5wR5yCqJgqR_G8y4Q1XgR5n2s")  # ضع توكن بوتك هنا أو عبر متغير البيئة
+# إعدادات التوكن الجديد وصلاحيات المشرف
+TOKEN = os.getenv("BOT_TOKEN", "8928709566:AAHLnA5OTsu0Gxmn3S-GBNAzzd_pNewAAfQ")
 ADMIN_IDS = [8611033531]  # معرف المشرف الأساسي
 
 bot = telebot.TeleBot(TOKEN)
@@ -35,7 +35,7 @@ def load_json(filename, default_value):
 def save_json(filename, data):
   try:
     with open(filename, "w", encoding="utf-8") as f:
-      json.dump(data, f, ensure_ascii, indent=4)
+      json.dump(data, f, ensure_ascii=False, indent=4)
   except Exception as e:
     print(f"Error saving {filename}: {e}")
 
