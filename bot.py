@@ -160,7 +160,7 @@ def background_price_monitor():
     time.sleep(300)
 
 
-# ----------------- أوامر تيليجرام (البوت) -----------------
+# ----------------- أوامر تيليجرام والقوائم الكاملة الأصلية -----------------
 @bot.message_handler(commands=["start"])
 def cmd_start(message):
   user_id = message.from_user.id
@@ -179,8 +179,17 @@ def cmd_start(message):
   )
   markup.add(
       types.KeyboardButton("💡 الذهب والأهداف"),
-      types.KeyboardButton("⚙️ المساعدة"),
+      types.KeyboardButton("🔍 بحث المصطلحات (/search)"),
   )
+  markup.add(
+      types.KeyboardButton("📚 الأكاديمية والتعليم"),
+      types.KeyboardButton("🧠 اختبارات التداول"),
+  )
+  markup.add(
+      types.KeyboardButton("📰 الأخبار والتنبيهات"),
+      types.KeyboardButton("💳 الحسابات والإيداع"),
+  )
+  markup.add(types.KeyboardButton("⚙️ المساعدة والدعم"))
 
   bot.send_message(message.chat.id, welcome_text, reply_markup=markup)
 
@@ -228,6 +237,65 @@ def show_stats_report(message):
       f"- نسبة النجاح: {m_stat.get('win_rate', 0.0)}%\n"
   )
   bot.send_message(message.chat.id, text, parse_mode="Markdown")
+
+
+@bot.message_handler(func=lambda msg: msg.text == "💡 الذهب والأهداف")
+def show_gold_targets(message):
+  bot.send_message(
+      message.chat.id,
+      "💡 **تحليل الذهب والأهداف:**\n\n"
+      "• الالتزام بإدارة المخاطر والصفقات الآمنة.\n"
+      "• جني الأرباح عند الهدف الأول وتأمين الصفقة.",
+      parse_mode="Markdown",
+  )
+
+
+@bot.message_handler(func=lambda msg: msg.text == "🔍 بحث المصطلحات (/search)")
+def show_search_guide(message):
+  bot.send_message(
+      message.chat.id,
+      "🔍 **البحث في المصطلحات:**\n\n"
+      "استخدم الأمر بالشكل التالي:\n`/search [المصطلح]`",
+      parse_mode="Markdown",
+  )
+
+
+@bot.message_handler(commands=["search"])
+def glossary_search(message):
+  try:
+    parts = message.text.split(maxsplit=1)
+    if len(parts) < 2:
+      bot.send_message(message.chat.id, "الاستخدام الصحيح: `/search [كلمة البحث]`", parse_mode="Markdown")
+      return
+    query = parts[1].strip()
+    bot.send_message(message.chat.id, f"🔍 نتائج البحث عن المصطلح: *{query}*", parse_mode="Markdown")
+  except Exception as e:
+    bot.send_message(message.chat.id, f"حدث خطأ: {e}")
+
+
+@bot.message_handler(func=lambda msg: msg.text == "📚 الأكاديمية والتعليم")
+def show_academy(message):
+  bot.send_message(message.chat.id, "📚 **الأكاديمية والتعليم:**\n\nدروس ومفاهيم التداول المتقدمة.", parse_mode="Markdown")
+
+
+@bot.message_handler(func=lambda msg: msg.text == "🧠 اختبارات التداول")
+def show_quizzes(message):
+  bot.send_message(message.chat.id, "🧠 **اختبارات التداول:**\n\nاختبر معلوماتك السوقية والتحليلية.", parse_mode="Markdown")
+
+
+@bot.message_handler(func=lambda msg: msg.text == "📰 الأخبار والتنبيهات")
+def show_news(message):
+  bot.send_message(message.chat.id, "📰 **الأخبار والتنبيهات:**\n\nأحدث التحليلات والأخبار الاقتصادية.", parse_mode="Markdown")
+
+
+@bot.message_handler(func=lambda msg: msg.text == "💳 الحسابات والإيداع")
+def show_accounts(message):
+  bot.send_message(message.chat.id, "💳 **الحسابات والإيداع:**\n\nدليل المنصات وطرق التحويل المتاحة.", parse_mode="Markdown")
+
+
+@bot.message_handler(func=lambda msg: msg.text == "⚙️ المساعدة والدعم")
+def show_help(message):
+  bot.send_message(message.chat.id, f"⚙️ **الدعم والمساعدة:**\nللتواصل: {ADMIN_USERNAME}", parse_mode="Markdown")
 
 
 @bot.message_handler(commands=["add_result"])
