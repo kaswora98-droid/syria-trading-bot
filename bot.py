@@ -62,7 +62,6 @@ def check_user_access(user_id):
   now = datetime.now()
 
   if str_id not in users:
-    # مستخدم جديد تماماً: منح فترة تجريبية 3 أيام لمنع استغلال مسح الدردشة
     trial_end = (now + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
     users[str_id] = {
         "joined_date": now.strftime("%Y-%m-%d %H:%M:%S"),
@@ -76,11 +75,9 @@ def check_user_access(user_id):
     )
 
   user_data = users[str_id]
-  # التحقق من الاشتراك الدائم
   if user_data.get("is_subscriber", False):
     return True, "مشترك دائم"
 
-  # التحقق من انتهاء الفترة التجريبية
   trial_until_str = user_data.get("trial_until")
   if trial_until_str:
     trial_end_dt = datetime.strptime(trial_until_str, "%Y-%m-%d %H:%M:%S")
@@ -88,8 +85,8 @@ def check_user_access(user_id):
       return True, f"فترة تجريبية نشطة حتى: {trial_until_str}"
     else:
       return (
-          فالس,
-          "انتهت فترتك التجريبية المجرّدة (3 أيام). يرجى الاشتراك للمتابعة.",
+          False,
+          "انتهت فترتك التجريبية (3 أيام). يرجى الاشتراك للمتابعة.",
       )
 
   return False, "غير مسموح بالوصول."
@@ -103,7 +100,6 @@ def update_periodic_performance_reports():
     return
 
   now = datetime.now()
-  # إحصائيات الأسبوع الأخير (آخر 7 أيام)
   week_ago = now - timedelta(days=7)
   month_ago = now - timedelta(days=30)
 
@@ -158,11 +154,10 @@ def run_flask():
 def background_price_monitor():
   while True:
     try:
-      # تحديث التقارير الدورية تلقائياً في الخلفية
       update_periodic_performance_reports()
     except Exception as e:
       print(f"Background monitor error: {e}")
-    time.sleep(300)  # فحص كل 5 دقائق
+    time.sleep(300)
 
 
 # ----------------- أوامر تيليجرام (البوت) -----------------
@@ -241,7 +236,6 @@ def admin_add_result(message):
     bot.send_message(message.chat.id, "هذا الأمر مخصص للمدير فقط.")
     return
 
-  # مثال توضيحي لإضافة صفقة: /add_result XAUUSD BUY Win
   try:
     parts = message.text.split()
     if len(parts) < 4:
@@ -254,7 +248,7 @@ def admin_add_result(message):
 
     pair, direction, result = parts[1], parts[2], parts[3]
     data = load_json(RESULTS_FILE, {"deals": [], "weekly_reports": [], "monthly_reports": []})
-    
+
     new_deal = {
         "pair": pair,
         "direction": direction,
@@ -272,24 +266,20 @@ def admin_add_result(message):
 
 # ----------------- التشغيل الرئيسي والخلفي -----------------
 if __name__ == "__main__":
-  # تشغيل سيرفر Flask في خيط خلفي (Background Thread) للحفاظ على الـ Uptime
   flask_thread = threading.Thread(target=run_flask, daemon=True)
   flask_thread.start()
 
-  # تشغيل مراقب الأسعار الخلفي
-  monitor_thread = threading.Thread(target=target := background_price_monitor, daemon=True)
+  monitor_thread = threading.Thread(target=background_price_monitor, daemon=True)
   monitor_thread.start()
 
   print("Bot server and background workers initialized successfully.")
 
-  # إزالة الويب هوك القديم وإلغاء أي جلسات معلقة لمنع خطأ التعارض 409 نهائياً
   try:
     bot.remove_webhook(drop_pending_updates=True)
     print("Old webhook and pending updates cleared successfully.")
   except Exception as e:
     print(f"Webhook clearance notice: {e}")
 
-  # بدء استقبال الرسائل والطلبات عبر التلفزيون/تيليجرام Long Polling باستقرار تان
   while True:
     try:
       bot.infinity_polling(skip_pending=True, timeout=60, long_polling_timeout=60)
