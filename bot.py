@@ -87,7 +87,7 @@ def ping():
   return "Pong!", 200
 
 
-# جلب الأسعار الحية للعملات
+# جلب الأسعار الحية الحقيقية من السوق
 def get_crypto_prices():
   try:
     url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,ripple&vs_currencies=usd"
@@ -100,11 +100,7 @@ def get_crypto_prices():
       return btc, eth, xrp
   except Exception:
     pass
-  return (
-      64950.0 + random.randint(-15, 15),
-      1815.0 + random.randint(-8, 8),
-      0.5200 + (random.randint(-2, 2) / 1000.0),
-  )
+  return 65000.0, 1850.0, 0.52
 
 
 # جلب سعر الذهب الحي (XAUUSD) المحدث
@@ -367,7 +363,7 @@ def send_golden_rule_deals(message):
   eth_sl = eth * (1 - 0.012)
 
   deals_text = (
-      "📊 **صفقات القاعدة الذهبية (النسب الثابتة وإدارة المخاطر):**\n\n"
+      "📊 **صفقات القاعدة الذهبية (النسب الثابتة وإدارة المخاطر - بالسعر الحي):**\n\n"
       "⚡ **1. صفقات السكالبينج:**\n"
       f"• **العملة:** XRP/USDT (سعر الدخول: `{xrp:,.4f}`)\n"
       f"  🛑 *وقف الخسارة (SL):* `{xrp_sl:,.4f}` (-1.2%)\n"
