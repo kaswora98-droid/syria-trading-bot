@@ -31,6 +31,7 @@ ADMIN_USERNAME = "@alone123987"
 DATA_FILE = "users_data.json"
 GROUPS_FILE = "groups_data.json"
 RESULTS_FILE = "trading_results.json"  # ملف تخزين نتائج الصفقات الحقيقية
+ACTIVE_DEALS_FILE = "active_tracked_deals.json"  # تخزين الصفقات المثبتة للمتداولين
 banned_users = set()
 
 risk_calculator_sessions = {}
@@ -100,6 +101,28 @@ def save_results(data):
       json.dump(data, f, ensure_ascii=False, indent=4)
   except Exception as e:
     print(f"Error saving results: {e}")
+
+
+# دوال إدارة وتثبيت الصفقات النشطة للمستخدمين تلقائياً عند طلبها
+def load_tracked_deals():
+  if os.path.exists(ACTIVE_DEALS_FILE):
+    try:
+      with open(ACTIVE_DEALS_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+        if not content.strip():
+          return {}
+        return json.loads(content)
+    except Exception:
+      return {}
+  return {}
+
+
+def save_tracked_deals(data):
+  try:
+    with open(ACTIVE_DEALS_FILE, "w", encoding="utf-8") as f:
+      json.dump(data, f, ensure_ascii=False, indent=4)
+  except Exception as e:
+    print(f"Error saving tracked deals: {e}")
 
 
 all_users = load_users()
@@ -468,7 +491,17 @@ def add_trading_result_cmd(message):
 
 @bot.message_handler(func=lambda message: message.text == "📊 صفقات القاعدة الذهبية للعملات")
 def send_golden_rule_deals(message):
+  user_id = str(message.from_user.id)
   btc, eth, xrp = get_crypto_prices()
+
+  # تثبيت وتتبع الصفقات للمستخدم تلقائياً فور إرسالها
+  tracked = load_tracked_deals()
+  tracked[user_id] = {
+      "type": "golden_rule",
+      "timestamp": datetime.now().isoformat(),
+      "entries": {"XRP": xrp, "BTC": btc, "ETH": eth}
+  }
+  save_tracked_deals(tracked)
 
   xrp_tp1_pct = calculate_profit_percentage(xrp, xrp * 1.008, "BUY")
   xrp_tp2_pct = calculate_profit_percentage(xrp, xrp * 1.015, "BUY")
@@ -483,6 +516,7 @@ def send_golden_rule_deals(message):
 
   deals_text = (
       "📊 **صفقات القاعدة الذهبية للعملات (النسب الثابتة وإدارة المخاطر - بالسعر الحي):**\n\n"
+      "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً.*\n\n"
       "⚡ **1. صفقات السكالبينج للعملات:**\n"
       f"• **العملة:** XRP/USDT (سعر الدخول: `{xrp:,.4f}`)\n"
       f"  🛑 *وقف الخسارة (SL):* `{xrp_sl:,.4f}` (-1.2%)\n"
@@ -526,6 +560,7 @@ def send_golden_rule_deals(message):
 
 @bot.message_handler(func=lambda message: message.text == "📊 صفقات الرؤية التحليلية للعملات")
 def send_analytical_vision_deals(message):
+  user_id = str(message.from_user.id)
   btc_price, btc_chg, btc_trend, btc_tp1_p, btc_tp2_p, btc_sl_p = (
       get_dynamic_deal_data("bitcoin", 65000.0)
   )
@@ -536,8 +571,18 @@ def send_analytical_vision_deals(message):
       get_dynamic_deal_data("ripple", 0.52)
   )
 
+  # تثبيت وتتبع الصفقات التحليلية تلقائياً
+  tracked = load_tracked_deals()
+  tracked[user_id] = {
+      "type": "analytical",
+      "timestamp": datetime.now().isoformat(),
+      "entries": {"BTC": btc_price, "ETH": eth_price, "XRP": xrp_price}
+  }
+  save_tracked_deals(tracked)
+
   deals_text = (
       "📊 **صفقات الرؤية التحليلية وقراءة الزخم الحي للعملات:**\n\n"
+      "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً.*\n\n"
       f"🪙 **1. بيتكوين (BTC/USDT):**\n"
       f"• السعر الحالي: `{btc_price:,.2f}$` (التغير 24س: `{btc_chg:+.2f}%`)\n"
       f"• الحالة: {btc_trend}\n"
@@ -567,13 +612,25 @@ def send_analytical_vision_deals(message):
     func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)"
 )
 def send_gold_golden_rule(message):
+  user_id = str(message.from_user.id)
   current_gold = get_gold_price()
+
+  # تثبيت سعر الذهب المرجعي تلقائياً
+  tracked = load_tracked_deals()
+  tracked[user_id] = {
+      "type": "gold_golden",
+      "timestamp": datetime.now().isoformat(),
+      "entries": {"GOLD": current_gold}
+  }
+  save_tracked_deals(tracked)
+
   tp1_price = current_gold * (1 + 0.007)
   tp2_price = current_gold * (1 + 0.015)
   sl_price = current_gold * (1 - 0.01)
 
   gold_text = (
       "🟡 **توصيات صفقات الذهب (القاعدة الذهبية):**\n\n"
+      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً.*\n\n"
       f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
       f"🛑 **وقف الخسارة المقترح (SL):** `{sl_price:,.2f}` $ (-1.0%)\n\n"
       "⚡ **1️⃣ صفقات الذهب اليومية:**\n"
@@ -590,13 +647,25 @@ def send_gold_golden_rule(message):
     func=lambda message: message.text == "🟡 صفقات الذهب (الرؤية التحليلية)"
 )
 def send_gold_analytical_vision(message):
+  user_id = str(message.from_user.id)
   current_gold = get_gold_price()
+
+  # تثبيت سعر الذهب التحليلي تلقائياً
+  tracked = load_tracked_deals()
+  tracked[user_id] = {
+      "type": "gold_analytical",
+      "timestamp": datetime.now().isoformat(),
+      "entries": {"GOLD": current_gold}
+  }
+  save_tracked_deals(tracked)
+
   tp1_price = current_gold * (1 + 0.01)
   tp2_price = current_gold * (1 + 0.022)
   sl_price = current_gold * (1 - 0.012)
 
   gold_text = (
       "🟡 **توصيات صفقات الذهب (الرؤية التحليلية والزخم الحي):**\n\n"
+      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً.*\n\n"
       f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
       f"🚀 **حالة السوق:** رصد سيولة شرائية وتذبذب إيجابي.\n"
       f"🛑 **وقف الخسارة (SL):** `{sl_price:,.2f}` $ (-1.2%)\n\n"
