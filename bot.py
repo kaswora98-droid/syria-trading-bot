@@ -239,7 +239,7 @@ def get_dynamic_deal_data(symbol_id, default_price):
   return default_price, 0.0, 0.01
 
 
-# --- القائمة الرئيسية تماماً كما كانت في صورتك الأولى ودون أي نقص ---
+# --- القائمة الرئيسية الأصلية بكامل أزرارها ودون أي نقصان ---
 def get_main_menu(user_id):
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
@@ -798,13 +798,16 @@ if __name__ == "__main__":
   alert_thread = threading.Thread(target=background_price_monitor, daemon=True)
   alert_thread.start()
 
+  # إزالة الويب هوك وتصفية التحديثات لتجنب خطأ 409 أثناء النشر التلقائي
   try:
     bot.remove_webhook(drop_pending_updates=True)
-    time.sleep(2)
+    time.sleep(1)
   except Exception as e:
     print(f"Error removing webhook: {e}")
 
-  try:
-    bot.infinity_polling(timeout=60, long_polling_timeout=60, skip_pending=True)
-  except Exception as e:
-    print(f"Polling error: {e}")
+  while True:
+    try:
+      bot.infinity_polling(timeout=60, long_polling_timeout=60, skip_pending=True)
+    except Exception as e:
+      print(f"Polling error: {e}")
+      time.sleep(5)
