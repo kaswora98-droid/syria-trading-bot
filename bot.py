@@ -77,7 +77,7 @@ all_users = load_users()
 active_groups = load_groups()
 
 
-# --- مسارات سيرفر الويب لترضاء منصة Render وتمنع خطأ البورت ---
+# --- مسارات سيرفر الويب لترضاء منصة Render ---
 @app.route("/")
 def home():
   return "Ultimate Trading Bot is running 24/7!"
@@ -86,11 +86,6 @@ def home():
 @app.route("/ping")
 def ping():
   return "Pong!", 200
-
-
-def run_flask():
-  port = int(os.environ.get("PORT", 10000))
-  app.run(host="0.0.0.0", port=port)
 
 
 # جلب الأسعار الحية للعملات
@@ -808,10 +803,14 @@ def show_stats(message):
 
 
 if __name__ == "__main__":
-  # خيط سيرفر الويب الضروري لخدمات الويب على Render
+  # تشغيل سيرفر الويب في خيط مستقل فوري لتلبية متطلبات Render Web Service
+  def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, use_reloader=False)
+
   flask_thread = threading.Thread(target=run_flask, daemon=True)
   flask_thread.start()
-  print("Flask web server started successfully...")
+  print("Flask web server started immediately...")
 
   alert_thread = threading.Thread(target=background_price_monitor, daemon=True)
   alert_thread.start()
