@@ -470,7 +470,7 @@ def send_analytical_vision_deals(message):
       f"⚡ **3. ريبل (XRP/USDT):**\n"
       f"• السعر الحالي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
       f"• الحالة: {xrp_trend}\n"
-      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.2f}`\n"
+      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.4f}`\n"
       f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.2f}` (+{xrp_tp1_p*100}%)\n\n"
       "🛡️ **نظام التأمين:** يتم تفعيل Breakeven (نقل وقف الخسارة لسعر الدخول)"
       " فور بلوغ الهدف الأول تلقائياً."
@@ -1030,17 +1030,20 @@ def admin_panel(message):
 def show_all_users(message):
   if message.from_user.id != ADMIN_ID:
     return
-  if not all_users:
+
+  current_users = load_users()
+
+  if not current_users:
     bot.send_message(message.chat.id, "📭 لا يوجد مشتركين في القاعدة حتى الآن.")
     return
 
   bot.send_message(
       message.chat.id,
-      f"👥 **قائمة المشتركين المسجلين (الإجمالي: {len(all_users)}):**",
+      f"👥 **قائمة المشتركين المسجلين (الإجمالي: {len(current_users)}):**",
       parse_mode="Markdown",
   )
 
-  for uid, info in list(all_users.items())[-15:]:
+  for uid, info in list(current_users.items())[-15:]:
     user_name = info.get("name", "بدون اسم")
     user_uname = info.get("username", "لا يوجد")
     expiry_date = info.get("expiry", "")[:10]
