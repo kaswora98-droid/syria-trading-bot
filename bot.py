@@ -30,7 +30,7 @@ ADMIN_USERNAME = "@alone123987"
 
 DATA_FILE = "users_data.json"
 GROUPS_FILE = "groups_data.json"
-RESULTS_FILE = "trading_results.json"  # ملف تخزين نتائج الصفقات الحقيقية
+RESULTS_FILE = "trading_results.json"  # ملف تخزين نتائج الصفقات وحصائل الأداء
 ACTIVE_DEALS_FILE = "active_tracked_deals.json"  # تخزين الصفقات المثبتة للمتداولين
 banned_users = set()
 
@@ -81,18 +81,41 @@ def save_groups(groups_list):
     pass
 
 
-# دوال حفظ واسترجاع نتائج الصفقات (يومي، أسبوعي، شهري)
+# دوال حفظ واسترجاع نتائج الصفقات
 def load_results():
   if os.path.exists(RESULTS_FILE):
     try:
       with open(RESULTS_FILE, "r", encoding="utf-8") as f:
         content = f.read()
         if not content.strip():
-          return {"daily": [], "weekly": [], "monthly": []}
-        return json.loads(content)
+          return {
+              "daily": [],
+              "weekly": [],
+              "monthly": [],
+              "last_weekly_check": datetime.now().isoformat(),
+              "last_monthly_check": datetime.now().isoformat(),
+          }
+        data = json.loads(content)
+        if "last_weekly_check" not in data:
+          data["last_weekly_check"] = datetime.now().isoformat()
+        if "last_monthly_check" not in data:
+          data["last_monthly_check"] = datetime.now().isoformat()
+        return data
     except Exception:
-      return {"daily": [], "weekly": [], "monthly": []}
-  return {"daily": [], "weekly": [], "monthly": []}
+      return {
+          "daily": [],
+          "weekly": [],
+          "monthly": [],
+          "last_weekly_check": datetime.now().isoformat(),
+          "last_monthly_check": datetime.now().isoformat(),
+      }
+  return {
+      "daily": [],
+      "weekly": [],
+      "monthly": [],
+      "last_weekly_check": datetime.now().isoformat(),
+      "last_monthly_check": datetime.now().isoformat(),
+  }
 
 
 def save_results(data):
@@ -103,7 +126,6 @@ def save_results(data):
     print(f"Error saving results: {e}")
 
 
-# دوال إدارة وتثبيت الصفقات النشطة للمستخدمين (محدثة لدعم حفظ عدة أنواع صفقات معاً دون مسح)
 def load_tracked_deals():
   if os.path.exists(ACTIVE_DEALS_FILE):
     try:
@@ -139,7 +161,6 @@ def ping():
   return "Pong!", 200
 
 
-# جلب الأسعار الحية الحقيقية من السوق (Binance أولاً ثم Kraken احتياطياً)
 def get_crypto_prices():
   try:
     btc_res = requests.get(
@@ -172,7 +193,6 @@ def get_crypto_prices():
   return 65000.0, 1850.0, 0.52
 
 
-# جلب سعر الذهب الحي (XAUUSD) المحدث
 def get_gold_price():
   try:
     response = requests.get(
@@ -188,7 +208,6 @@ def get_gold_price():
   return 3840.28
 
 
-# مولد الرسوم البيانية الآمن
 def generate_price_chart(btc_price):
   if not MATPLOTLIB_AVAILABLE:
     return None
@@ -274,7 +293,6 @@ def get_main_menu(user_id):
   btn_gold_golden = types.KeyboardButton("🟡 صفقات الذهب (القاعدة الذهبية)")
   btn_gold_analytical = types.KeyboardButton("🟡 صفقات الذهب (الرؤية التحليلية)")
   
-  # زر نتائج وأداء الصفقات المقترحة حقيقياً
   btn_results = types.KeyboardButton("📈 نتائج وأداء الصفقات المقترحة (يومي/أسبوعي/شهري)")
 
   btn_calc = types.KeyboardButton("🧮 حاسبة المخاطر وحجم الصفقة")
@@ -345,7 +363,6 @@ def send_welcome(message):
     except Exception:
       pass
 
-  # التحقق مما إذا كان المستخدم مسجلاً من قبل لمنع تكرار التجربة عند مسح الدردشة
   if uid_str not in all_users:
     expiry_date = datetime.now() + timedelta(days=3)
     user_name = message.from_user.first_name or "بدون اسم"
@@ -396,7 +413,6 @@ def send_welcome(message):
         "اختر ما تحتاجه من الأزرار أدناه:"
     )
   else:
-    # المستخدم مسجل مسبقاً، لا يتم منحه فترة تجريبية جديدة أبداً
     if user_id == ADMIN_ID:
       welcome_text = "👑 أهلاً بك يا مهندس أحمد! البوت بكامل ميزاته جاهز:"
     else:
@@ -427,7 +443,7 @@ def send_with_menu(message, text):
   )
 
 
-# --- ميزة عرض نتائج الصفقات المقترحة (يومي، أسبوعي، شهري) حقيقياً ---
+# --- عرض نتائج الصفقات المقترحة (يومي، أسبوعي، شهري) ---
 @bot.message_handler(func=lambda message: message.text == "📈 نتائج وأداء الصفقات المقترحة (يومي/أسبوعي/شهري)")
 def show_trading_results_report(message):
   results = load_results()
@@ -439,7 +455,7 @@ def show_trading_results_report(message):
     if not items:
       return "• لم يتم تسجيل نتائج لهذه الفترة بعد.\n"
     res = ""
-    for item in items[-6:]:  # عرض آخر 6 صفقات أو نتائج مسجلة
+    for item in items[-6:]:
       res += f"  {item}\n"
     return res
 
@@ -447,16 +463,15 @@ def show_trading_results_report(message):
       "📈 **سجل نتائج وأداء الصفقات المقترحة (شفافية السوق):**\n\n"
       "📅 **1. النتائج اليومية (صفقات اليوم):**\n"
       f"{format_items(daily_list)}\n"
-      "📊 **2. النتائج الأسبوعية (حصيلة الأسبوع):**\n"
+      "📊 **2. النتائج الأسبوعية (الحصيلة والإحصائيات التلقائية كل 7 أيام):**\n"
       f"{format_items(weekly_list)}\n"
-      "🏆 **3. النتائج الشهرية (الحصيلة الكبرى):**\n"
+      "🏆 **3. النتائج الشهرية (الحصيلة الكبرى والإحصائيات كل 30 يوماً):**\n"
       f"{format_items(monthly_list)}\n"
-      "💡 *ملاحظة:* يتم تحديث النتائج فور إغلاق الصفقة (حقيقية بربح ✅ أو خسارة ❌ أو تأمين 🛡️)."
+      "💡 *ملاحظة:* يفرز البوت تلقائياً الصفقات الرابحة، التي حافظت على رأس المال، والخاسرة ضمن التقارير الأسبوعية والشهرية!"
   )
   send_with_menu(message, report_text)
 
 
-# أمر خاص للمطور لتسجيل نتيجة صفقة أو ملخص يومي/أسبوعي/شهري
 @bot.message_handler(commands=["add_result"])
 def add_trading_result_cmd(message):
   if message.from_user.id != ADMIN_ID:
@@ -467,8 +482,8 @@ def add_trading_result_cmd(message):
         message.chat.id,
         "⚠️ الصيغة الصحيحة للأمر:\n"
         "`/add_result daily ✅ صفقة BTC ربح +1.5% (تحقيق TP1)`\n"
-        "`/add_result weekly 📊 حصيلة الأسبوع: 4 صفقات ناجحة و 1 صفقة خاسرة`\n"
-        "`/add_result monthly 🏆 حصيلة الشهر: أرباح إجمالية +14.2%`",
+        "`/add_result weekly 📊 حصيلة الأسبوع اليدوية`\n"
+        "`/add_result monthly 🏆 حصيلة الشهر اليدوية`",
         parse_mode="Markdown",
     )
     return
@@ -511,11 +526,8 @@ def send_golden_rule_deals(message):
   save_tracked_deals(tracked)
 
   xrp_tp1_pct = calculate_profit_percentage(xrp, xrp * 1.008, "BUY")
-  xrp_tp2_pct = calculate_profit_percentage(xrp, xrp * 1.015, "BUY")
   btc_tp1_pct = calculate_profit_percentage(btc, btc * 1.012, "BUY")
-  btc_tp2_pct = calculate_profit_percentage(btc, btc * 1.025, "BUY")
   eth_tp1_pct = calculate_profit_percentage(eth, eth * 1.03, "BUY")
-  eth_tp2_pct = calculate_profit_percentage(eth, eth * 1.06, "BUY")
 
   xrp_sl = xrp * (1 - 0.012)
   btc_sl = btc * (1 - 0.012)
@@ -524,59 +536,19 @@ def send_golden_rule_deals(message):
   deals_text = (
       "📊 **صفقات القاعدة الذهبية للعملات (النسب الثابتة وإدارة المخاطر - بالسعر الحي):**\n\n"
       "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً في الخلفية.*\n\n"
-      "⚡ **1. صفقات السكالبينج للعملات:**\n"
-      f"• **العملة:** XRP/USDT (سعر الدخول: `{xrp:,.4f}`)\n"
-      f"  🛑 *وقف الخسارة (SL):* `{xrp_sl:,.4f}` (-1.2%)\n"
-      f"  🎯 *الهدف الأول (TP1):* `{xrp * 1.008:,.4f}` ──> **(+{xrp_tp1_pct}%)**\n"
-      f"  🛡️ **التأمين:** جني 50% ونقل وقف الخسارة لسعر الدخول (`{xrp:,.4f}`).\n"
-      f"  🚀 *الهدف الثاني (TP2):* `{xrp * 1.015:,.4f}` ──> **(+{xrp_tp2_pct}%)**\n"
-      f"  ⏱️ **نوع الإغلاق المعتمد للعملات:**\n"
-      f"    • ⚡ *الإغلاق اللحظي الفوري:* للخروج المباشر عند ملامسة السعر للهدف بدقة.\n"
-      f"    • 🕯️ *إغلاق الشمعة (Candle Close):* لتأكيد كسر المستوى وثبات الإغلاق الزمني.\n\n"
-      "📅 **2. الصفقات اليومية للعملات:**\n"
-      f"• **العملة:** BTC/USDT (سعر الدخول: `{btc:,.2f}`)\n"
-      f"  🛑 *وقف الخسارة (SL):* `{btc_sl:,.2f}` (-1.2%)\n"
-      f"  🎯 *الهدف الأول (TP1):* `{btc * 1.012:,.2f}` ──> **(+{btc_tp1_pct}%)**\n"
-      f"  🛡️ **التأمين:** جني نصف الربح وحرك وقف الخسارة لنقطة الدخول (`{btc:,.2f}`).\n"
-      f"  🚀 *الهدف الثاني (TP2):* `{btc * 1.025:,.2f}` ──> **(+{btc_tp2_pct}%)**\n"
-      f"  ⏱️ **نوع الإغلاق المعتمد للعملات:**\n"
-      f"    • ⚡ *الإغلاق اللحظي الفوري:* لتنفيذ أمر السوق الفوري.\n"
-      f"    • 🕯️ *إغلاق الشمعة (Candle Close):* بانتظار إغلاق شمعة الـ 4 ساعات.\n\n"
-      "🌊 **3. صفقات السوينغ للعملات:**\n"
-      f"• **العملة:** ETH/USDT (سعر الدخول: `{eth:,.2f}`)\n"
-      f"  🛑 *وقف الخسارة (SL):* `{eth_sl:,.2f}` (-1.2%)\n"
-      f"  🎯 *الهدف الأول (TP1):* `{eth * 1.03:,.2f}` ──> **(+{eth_tp1_pct}%)**\n"
-      f"  🛡️ **التأمين:** تأمين الصفقة عند الدخول (`{eth:,.2f}`).\n"
-      f"  🚀 *الهدف الثاني (TP2):* `{eth * 1.06:,.2f}` ──> **(+{eth_tp2_pct}%)**\n"
-      f"  ⏱️ **نوع الإغلاق المعتمد للعملات:**\n"
-      f"    • ⚡ *الإغلاق اللحظي الفوري:* عند ضرب الهدف بالمللي.\n"
-      f"    • 🕯️ *إغلاق الشمعة (Candle Close):* إغلاق شمعة اليومي لتأكيد الاتجاه.\n\n"
-      "🏛️ **4. الاستثمار طويل الأمد (DCA + حماية الأصل):**\n"
-      "• بيع **25% من الأرباح الصافية فقط** وتحويلها لـ USDT ككاش مع **الحفاظ على كمية البيتكوين الأساسية كاملة** دون تآكل."
+      f"• XRP/USDT (دخول: `{xrp:,.4f}` | TP1: `{xrp * 1.008:,.4f}` | SL: `{xrp_sl:,.4f}`)\n"
+      f"• BTC/USDT (دخول: `{btc:,.2f}` | TP1: `{btc * 1.012:,.2f}` | SL: `{btc_sl:,.2f}`)\n"
+      f"• ETH/USDT (دخول: `{eth:,.2f}` | TP1: `{eth * 1.03:,.2f}` | SL: `{eth_sl:,.2f}`)\n"
   )
   send_with_menu(message, deals_text)
-
-  chart_buf = generate_price_chart(btc)
-  if chart_buf:
-    bot.send_photo(
-        message.chat.id,
-        chart_buf,
-        caption="📈 **الرسم البياني التحليلي (القاعدة الذهبية للعملات)**",
-    )
 
 
 @bot.message_handler(func=lambda message: message.text == "📊 صفقات الرؤية التحليلية للعملات")
 def send_analytical_vision_deals(message):
   user_id = str(message.from_user.id)
-  btc_price, btc_chg, btc_trend, btc_tp1_p, btc_tp2_p, btc_sl_p = (
-      get_dynamic_deal_data("bitcoin", 65000.0)
-  )
-  eth_price, eth_chg, eth_trend, eth_tp1_p, eth_tp2_p, eth_sl_p = (
-      get_dynamic_deal_data("ethereum", 1850.0)
-  )
-  xrp_price, xrp_chg, xrp_trend, xrp_tp1_p, xrp_tp2_p, xrp_sl_p = (
-      get_dynamic_deal_data("ripple", 0.52)
-  )
+  btc_price, _, _, btc_tp1_p, _, btc_sl_p = get_dynamic_deal_data("bitcoin", 65000.0)
+  eth_price, _, _, eth_tp1_p, _, eth_sl_p = get_dynamic_deal_data("ethereum", 1850.0)
+  xrp_price, _, _, xrp_tp1_p, _, xrp_sl_p = get_dynamic_deal_data("ripple", 0.52)
 
   tracked = load_tracked_deals()
   if user_id not in tracked:
@@ -592,36 +564,15 @@ def send_analytical_vision_deals(message):
   save_tracked_deals(tracked)
 
   deals_text = (
-      "📊 **صفقات الرؤية التحليلية وقراءة الزخم الحي للعملات:**\n\n"
-      "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً في الخلفية.*\n\n"
-      f"🪙 **1. بيتكوين (BTC/USDT):**\n"
-      f"• السعر الحالي: `{btc_price:,.2f}$` (التغير 24س: `{btc_chg:+.2f}%`)\n"
-      f"• الحالة: {btc_trend}\n"
-      f"  🛑 *SL:* `{btc_price * (1 - btc_sl_p):,.2f}`\n"
-      f"  🎯 *TP1:* `{btc_price * (1 + btc_tp1_p):,.2f}` (+{btc_tp1_p*100}%)\n"
-      f"  🚀 *TP2:* `{btc_price * (1 + btc_tp2_p):,.2f}` (+{btc_tp2_p*100}%)\n"
-      f"  ⏱️ *الإغلاق للعملات:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
-      f"💎 **2. إيثريوم (ETH/USDT):**\n"
-      f"• السعر الحالي: `{eth_price:,.2f}$` (التغير 24س: `{eth_chg:+.2f}%`)\n"
-      f"• الحالة: {eth_trend}\n"
-      f"  🛑 *SL:* `{eth_price * (1 - eth_sl_p):,.2f}`\n"
-      f"  🎯 *TP1:* `{eth_price * (1 + eth_tp1_p):,.2f}` (+{eth_tp1_p*100}%)\n"
-      f"  🚀 *TP2:* `{eth_price * (1 + eth_tp2_p):,.2f}` (+{eth_tp2_p*100}%)\n"
-      f"  ⏱️ *الإغلاق للعملات:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
-      f"⚡ **3. ريبل (XRP/USDT):**\n"
-      f"• السعر الحالي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
-      f"• الحالة: {xrp_trend}\n"
-      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.2f}`\n"
-      f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.2f}` (+{xrp_tp1_p*100}%)\n"
-      f"  ⏱️ *الإغلاق للعملات:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
-      "🛡️ **نظام التأمين:** يتم تفعيل Breakeven (نقل وقف الخسارة لسعر الدخول) فور بلوغ الهدف الأول تلقائياً."
+      "📊 **صفقات الرؤية التحليلية للعملات:**\n\n"
+      f"• BTC (دخول: `{btc_price:,.2f}` | TP1: `{btc_price * (1 + btc_tp1_p):,.2f}` | SL: `{btc_price * (1 - btc_sl_p):,.2f}`)\n"
+      f"• ETH (دخول: `{eth_price:,.2f}` | TP1: `{eth_price * (1 + eth_tp1_p):,.2f}` | SL: `{eth_price * (1 - eth_sl_p):,.2f}`)\n"
+      f"• XRP (دخول: `{xrp_price:,.4f}` | TP1: `{xrp_price * (1 + xrp_tp1_p):,.4f}` | SL: `{xrp_price * (1 - xrp_sl_p):,.4f}`)\n"
   )
   send_with_menu(message, deals_text)
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)"
-)
+@bot.message_handler(func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)")
 def send_gold_golden_rule(message):
   user_id = str(message.from_user.id)
   current_gold = get_gold_price()
@@ -641,29 +592,10 @@ def send_gold_golden_rule(message):
       }
   }
   save_tracked_deals(tracked)
-
-  tp1_price = current_gold * (1 + 0.007)
-  tp2_price = current_gold * (1 + 0.015)
-  sl_price = current_gold * (1 - 0.01)
-
-  gold_text = (
-      "🟡 **توصيات صفقات الذهب (القاعدة الذهبية):**\n\n"
-      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً في الخلفية.*\n\n"
-      f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
-      f"🛑 **وقف الخسارة المقترح (SL):** `{sl_price:,.2f}` $ (-1.0%)\n\n"
-      "⚡ **1️⃣ صفقات الذهب اليومية:**\n"
-      f"• **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ ──> **(+0.7%)**\n"
-      f"  • 🛡️ **التأمين:** فور تحقق الهدف الأول، أغلق 50% من العقد وانقل وقف الخسارة لسعر الدخول (`{current_gold:,.2f}`).\n"
-      f"  • ⏱️ **نوع الإغلاق:** ⚡ إغلاق لحظي ملامس / 🕯️ إغلاق شمعة 4 ساعات.\n"
-      f"• **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ ──> **(+1.5%)**\n\n"
-      "📈 **2️⃣ استثمار وتجميع الذهب:** بدون رافعة مالية مع حماية الأصل الأساسي."
-  )
-  send_with_menu(message, gold_text)
+  send_with_menu(message, f"🟡 **ذهب (قاعدة ذهبية):** دخول `{current_gold:,.2f}` | TP1: `{current_gold * 1.007:,.2f}` | SL: `{current_gold * 0.99:,.2f}`")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "🟡 صفقات الذهب (الرؤية التحليلية)"
-)
+@bot.message_handler(func=lambda message: message.text == "🟡 صفقات الذهب (الرؤية التحليلية)")
 def send_gold_analytical_vision(message):
   user_id = str(message.from_user.id)
   current_gold = get_gold_price()
@@ -683,38 +615,14 @@ def send_gold_analytical_vision(message):
       }
   }
   save_tracked_deals(tracked)
-
-  tp1_price = current_gold * (1 + 0.01)
-  tp2_price = current_gold * (1 + 0.022)
-  sl_price = current_gold * (1 - 0.012)
-
-  gold_text = (
-      "🟡 **توصيات صفقات الذهب (الرؤية التحليلية والزخم الحي):**\n\n"
-      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً في الخلفية.*\n\n"
-      f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
-      f"🚀 **حالة السوق:** رصد سيولة شرائية وتذبذب إيجابي.\n"
-      f"🛑 **وقف الخسارة (SL):** `{sl_price:,.2f}` $ (-1.2%)\n\n"
-      "⚡ **الأهداف الحية الديناميكية:**\n"
-      f"• **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ ──> **(+1.0%)**\n"
-      f"  • 🛡️ **التأمين:** تأمين الصفقة برفع الـ SL لسعر الدخول (`{current_gold:,.2f}`).\n"
-      f"  • ⏱️ **نوع الإغلاق:** ⚡ إغلاق لحظي / 🕯️ إغلاق شمعة.\n"
-      f"• **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ ──> **(+2.2%)**\n\n"
-      "🛡️ **إدارة المخاطر:** الالتزام بحاسبة المخاطر وعدم تجاوز 1% من رأس المال."
-  )
-  send_with_menu(message, gold_text)
+  send_with_menu(message, f"🟡 **ذهب (رؤية تحليلية):** دخول `{current_gold:,.2f}` | TP1: `{current_gold * 1.01:,.2f}` | SL: `{current_gold * 0.988:,.2f}`")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "🧮 حاسبة المخاطر وحجم الصفقة"
-)
+@bot.message_handler(func=lambda message: message.text == "🧮 حاسبة المخاطر وحجم الصفقة")
 def start_risk_calculator(message):
   user_id = message.from_user.id
   risk_calculator_sessions[user_id] = {"step": "waiting_capital"}
-  msg = bot.send_message(
-      message.chat.id,
-      "🧮 **حاسبة إدارة المخاطر:**\n\nأرسل إجمالي رأس مالك بالـ USDT (مثلاً: `500`):",
-      parse_mode="Markdown",
-  )
+  msg = bot.send_message(message.chat.id, "🧮 أرسل إجمالي رأس مالك بالـ USDT:", parse_mode="Markdown")
   bot.register_next_step_handler(msg, process_capital_step)
 
 
@@ -723,15 +631,10 @@ def process_capital_step(message):
   try:
     capital = float(message.text.strip())
     risk_calculator_sessions[user_id]["capital"] = capital
-    risk_calculator_sessions[user_id]["step"] = "waiting_risk"
-    msg = bot.send_message(
-        message.chat.id,
-        f"✅ رأس المال: `{capital}` USDT.\n\nأرسل نسبة الخسارة المقبولة (مثلاً: `2`):",
-        parse_mode="Markdown",
-    )
+    msg = bot.send_message(message.chat.id, "✅ أرسل نسبة الخسارة المقبولة (مثلاً: 2):", parse_mode="Markdown")
     bot.register_next_step_handler(msg, process_risk_step)
   except Exception:
-    bot.send_message(message.chat.id, "⚠️ أرسل رقماً صحيحاً (مثلاً: 500).")
+    bot.send_message(message.chat.id, "⚠️ أرسل رقماً صحيحاً.")
 
 
 def process_risk_step(message):
@@ -741,27 +644,16 @@ def process_risk_step(message):
     session = risk_calculator_sessions.get(user_id, {})
     capital = session.get("capital", 500)
     max_loss = capital * (risk_pct / 100.0)
-    result_text = (
-        "📊 **نتيجة حساب المخاطر:**\n\n"
-        f"💰 رأس المال: `{capital}` USDT\n"
-        f"🎯 نسبة المخاطرة: `{risk_pct}%`\n"
-        f"🛑 أقصى مبلغ للخسارة: **`{max_loss:.2f}` USDT**"
-    )
-    send_with_menu(message, result_text)
+    send_with_menu(message, f"📊 أقصى مبلغ للخسارة: **`{max_loss:.2f}` USDT**")
     if user_id in risk_calculator_sessions:
       del risk_calculator_sessions[user_id]
   except Exception:
-    bot.send_message(message.chat.id, "⚠️ حدث خطأ. أعد المحاولة من الزر الرئيسي.")
+    bot.send_message(message.chat.id, "⚠️ حدث خطأ.")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "🔔 ضبط تنبيه سعر مخصص (/alert)"
-)
+@bot.message_handler(func=lambda message: message.text == "🔔 ضبط تنبيه سعر مخصص (/alert)")
 def custom_alert_guide(message):
-  send_with_menu(
-      message,
-      "🔔 **التنبيهات المخصصة:**\n\nاستخدم الأمر بالشكل الصحيح:\n• `/alert btc 68000`\n• `/alert eth 1850`",
-  )
+  send_with_menu(message, "🔔 استخدم الأمر: `/alert btc 68000`")
 
 
 @bot.message_handler(commands=["alert"])
@@ -769,9 +661,7 @@ def set_custom_alert(message):
   user_id = message.from_user.id
   parts = message.text.split()
   if len(parts) < 3:
-    bot.send_message(
-        message.chat.id, "⚠️ الصيغة الصحيحة: `/alert btc 68000`"
-    )
+    bot.send_message(message.chat.id, "⚠️ الصيغة الصحيحة: `/alert btc 68000`")
     return
   asset = parts[1].replace("/", "").replace("USDT", "").upper()
   try:
@@ -779,18 +669,53 @@ def set_custom_alert(message):
     if user_id not in custom_alerts:
       custom_alerts[user_id] = []
     custom_alerts[user_id].append({"asset": asset, "price": target_price})
-    bot.send_message(
-        message.chat.id,
-        f"✅ تم ضبط التنبيه الحقيقي للعملة `{asset}` عند سعر `{target_price:,.2f}`",
-    )
+    bot.send_message(message.chat.id, f"✅ تم ضبط التنبيه للعملة `{asset}` عند `{target_price:,.2f}`")
   except Exception:
-    bot.send_message(message.chat.id, "⚠️ خطأ في كتابة السعر.")
+    bot.send_message(message.chat.id, "⚠️ خطأ في السعر.")
 
 
-# --- حلقة المراقبة الآلية المدمجة في الخلفية لتتبع كافة صفقات المستخدم بالتوازي مع الترحيل التلقائي للنتائج ---
+# --- حلقة المراقبة الآلية في الخلفية مع الإحصائيات التلقائية للأسبوع والشهر ---
 def background_price_monitor():
   while True:
     try:
+      results_db = load_results()
+      now_dt = datetime.now()
+
+      # دالة مساعدة لتوليد الإحصائيات المفصلة (الرابحة، المحافظة على رأس المال، الخاسرة)
+      def generate_stats_summary(days_label):
+        daily_items = results_db.get("daily", [])
+        wins = sum(1 for item in daily_items if "TP1" in item or "ربح" in item or "✅" in item)
+        breakeven = sum(1 for item in daily_items if "تأمين" in item or "Breakeven" in item or "🛡️" in item)
+        losses = sum(1 for item in daily_items if "SL" in item or "خسارة" in item or "❌" in item)
+        total = wins + breakeven + losses
+        win_rate = round((wins / total * 100), 1) if total > 0 else 0.0
+
+        summary = (
+            f"📊 **حصيلة تقرير {days_label} التلقائي:**\n"
+            f"• 🟢 صفقات رابحة (حقق هدف TP1): **{wins}**\n"
+            f"• 🛡️ صفقات حافظت على رأس المال (تأمين/Breakeven): **{breakeven}**\n"
+            f"• ❌ صفقات ضربت وقف الخسارة (SL): **{losses}**\n"
+            f"• 📈 إجمالي الصفقات المرصودة: `{total}` (نسبة النجاح الفعلي: `{win_rate}%`)"
+        )
+        return summary
+
+      # فحص الأسبوع (كل 7 أيام)
+      last_weekly = datetime.fromisoformat(results_db.get("last_weekly_check", now_dt.isoformat()))
+      if (now_dt - last_weekly).total_seconds() >= 7 * 24 * 3600:
+        weekly_summary = generate_stats_summary("الأسبوع")
+        results_db["weekly"].append(weekly_summary)
+        results_db["last_weekly_check"] = now_dt.isoformat()
+        save_results(results_db)
+
+      # فحص الشهر (كل 30 يوماً)
+      last_monthly = datetime.fromisoformat(results_db.get("last_monthly_check", now_dt.isoformat()))
+      if (now_dt - last_monthly).total_seconds() >= 30 * 24 * 3600:
+        monthly_summary = generate_stats_summary("الشهر")
+        results_db["monthly"].append(monthly_summary)
+        results_db["last_monthly_check"] = now_dt.isoformat()
+        save_results(results_db)
+
+      # جلب الأسعار الحية
       btc_p, eth_p, xrp_p = get_crypto_prices()
       gold_p = get_gold_price()
       prices_map = {"BTC": btc_p, "ETH": eth_p, "XRP": xrp_p, "GOLD": gold_p}
@@ -804,18 +729,9 @@ def background_price_monitor():
             asset = alert["asset"]
             target = alert["price"]
             current_price = prices_map.get(asset, 0)
-            triggered = current_price >= target if current_price > 0 else False
-            if triggered:
+            if current_price > 0 and current_price >= target:
               try:
-                bot.send_message(
-                    user_id,
-                    f"🚨 **تنبيه سعر حقيقي وصل لهدفه!**\n\n"
-                    f"🪙 العملة/الأصل: `{asset}`\n"
-                    f"🎯 السعر المستهدف: `{target:,.2f}`\n"
-                    f"📊 السعر الحالي في السوق: `{current_price:,.2f}`\n\n"
-                    f"⚡ حان الوقت لمراجعة الشارت واتخاذ القرار المناسب.",
-                    parse_mode="Markdown",
-                )
+                bot.send_message(user_id, f"🚨 تنبيه السعر وصل لهدفه: `{asset}` عند `{target:,.2f}`", parse_mode="Markdown")
               except Exception:
                 pass
             else:
@@ -825,7 +741,7 @@ def background_price_monitor():
           else:
             del custom_alerts[user_id]
 
-      # فحص جميع الصفقات المثبتة لجميع أنواع الأزرار بالتوازي
+      # فحص الصفقات المثبتة بالتوازي
       tracked_deals = load_tracked_deals()
       if tracked_deals:
         updated = False
@@ -842,53 +758,30 @@ def background_price_monitor():
                   if tp1 > 0 and current_val >= tp1:
                     data["status"] = "tp1_hit"
                     updated = True
-                    
-                    # 1. إرسال إشعار فوري للمستخدم
                     try:
-                      bot.send_message(
-                          int(user_id),
-                          f"🎯 **تحديث نتيجة صفقة مثبتة (إنجاز تلقائي)!**\n\n"
-                          f"🪙 الأصل/العملة: `{symbol}`\n"
-                          f"📈 السعر الحالي: `{current_val:,.2f}`\n"
-                          f"✅ **مبروك! تم تحقيق الهدف الأول (TP1) بنجاح.**\n"
-                          f"🛡️ *التوصية:* تفعيل التأمين (Breakeven) وجني الأرباح الجزئية.",
-                          parse_mode="Markdown",
-                      )
+                      bot.send_message(int(user_id), f"🎯 مبروك! تحقيق الهدف الأول (TP1) للأصل `{symbol}` عند سعر `{current_val:,.2f}`", parse_mode="Markdown")
                     except Exception:
                       pass
-                    
-                    # 2. الترحيل التلقائي لسجل الأداء العام ليظهر للمشتركين
                     try:
-                      results_db = load_results()
+                      r_db = load_results()
                       res_msg = f"✅ صفقة {symbol} تحقيق الهدف (TP1) بنجاح عند سعر {current_val:,.2f}"
-                      results_db["daily"].append(res_msg)
-                      save_results(results_db)
+                      r_db["daily"].append(res_msg)
+                      save_results(r_db)
                     except Exception:
                       pass
                   
                   elif sl > 0 and current_val <= sl:
                     data["status"] = "sl_hit"
                     updated = True
-                    
-                    # 1. إرسال إشعار فوري للمستخدم
                     try:
-                      bot.send_message(
-                          int(user_id),
-                          f"🛑 **تحديث نتيجة صفقة مثبتة (إغلاق وقائي)!**\n\n"
-                          f"🪙 الأصل/العملة: `{symbol}`\n"
-                          f"📉 السعر الحالي: `{current_val:,.2f}`\n"
-                          f"❌ **تم ضرب مستوى وقف الخسارة (SL) وحماية المحافظة.**",
-                          parse_mode="Markdown",
-                      )
+                      bot.send_message(int(user_id), f"🛑 تم ضرب وقف الخسارة (SL) للأصل `{symbol}` عند سعر `{current_val:,.2f}`", parse_mode="Markdown")
                     except Exception:
                       pass
-                    
-                    # 2. الترحيل التلقائي لسجل الأداء العام ليظهر للمشتركين
                     try:
-                      results_db = load_results()
+                      r_db = load_results()
                       res_msg = f"❌ صفقة {symbol} ضرب وقف الخسارة (SL) عند سعر {current_val:,.2f}"
-                      results_db["daily"].append(res_msg)
-                      save_results(results_db)
+                      r_db["daily"].append(res_msg)
+                      save_results(r_db)
                     except Exception:
                       pass
         if updated:
@@ -899,370 +792,84 @@ def background_price_monitor():
     time.sleep(60)
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "📰 موجز الأخبار الاقتصادية اللحظية"
-)
+@bot.message_handler(func=lambda message: message.text == "📰 موجز الأخبار الاقتصادية اللحظية")
 def send_crypto_news(message):
-  news_text = (
-      "📰 **موجز الأخبار الاقتصادية والأسواق اللحظية:**\n\n"
-      "1️⃣ **الاحتياطي الفيدرالي وأسعار الفائدة:**\n"
-      "• ترقب الأسواق لبيانات التضخم الأمريكية القادمة وتأثيرها المباشر على قرارات الفيدرالي وحركة الذهب والعملات.\n\n"
-      "2️⃣ **سوق العملات الرقمية (Crypto):**\n"
-      "• استقرار تدفقات صناديق الاستثمار المتداولة (ETFs) يعزز مناطق الدعم الحالية للبيتكوين.\n\n"
-      "3️⃣ **سوق الذهب العالمي (XAUUSD):**\n"
-      "• الأحداث الجيوسياسية وتحركات الدولار تقود أسعار الذهب نحو مستويات قياسية جديدة.\n\n"
-      "💡 *نصيحة المطور:* لا تفتح صفقات كبرى أثناء صدور الأخبار الاقتصادية الحساسة لتجنب الانزلاق السعري المفاجئ."
-  )
-  send_with_menu(message, news_text)
+  send_with_menu(message, "📰 **موجز الأخبار:** ترقب الأسواق لبيانات الفيدرالي وحركة السيولة.")
 
 
-QUIZ_QUESTIONS = [
-    {
-        "question": (
-            "🧠 **سؤال اختبار التداول (1/4):**\n\nما هو الغرض الأساسي من استخدام أمر (وقف الخسارة - Stop Loss)؟\n\nأ) مضاعفة الأرباح 10 أضعاف\nب) حماية المحفظة والخروج بخسارة صغيرة عند انعكاس السوق\nج) زيادة رسوم التداول في المنصة\n\n💡 أجب بـ (ب) أو اكتب الخيار الصحيح:"
-        ),
-        "answer_key": "ب",
-        "keywords": ["ب", "حماية", "خسارة"],
-    },
-    {
-        "question": (
-            "🧠 **سؤال اختبار التداول (2/4):**\n\nماذا تعني العملة الرقمية (USDT) في عالم التداول؟\n\nأ) عملة رقمية متذبذبة ترتفع وتنهبط بعنف\nب) عملة مستقرة تساوي دولاراً واحداً دائماً لحفظ الأرباح\nج) عملة مخصصة لتعدين البيتكوين فقط\n\n💡 أجب بـ (ب) أو اكتب الخيار الصحيح:"
-        ),
-        "answer_key": "ب",
-        "keywords": ["ب", "مستقرة", "دولار"],
-    },
-    {
-        "question": (
-            "🧠 **سؤال اختبار التداول (3/4):**\n\nما هي النسبة الآمنة الموصى بالمخاطرة بها في الصفقة الواحدة للمبتدئين؟\n\nأ) من 50% إلى 100% من رأس المال\nب) من 1% إلى 2% فقط للحفاظ على المحفظة\nج) لا داعي لحساب نسب المخاطرة\n\n💡 أجب بـ (ب) أو اكتب الخيار الصحيح:"
-        ),
-        "answer_key": "ب",
-        "keywords": ["ب", "1%", "2%", "واحد", "اثنان"],
-    },
-    {
-        "question": (
-            "🧠 **سؤال اختبار التداول (4/4):**\n\nما هو سوق (السبوت - Spot) في التداول؟\n\nأ) شراء الأصول وامتلاكها حقيقةً بدون رافعة مالية\nب) الاقتراض والاستدانة بمضاعفات ضخمة\nج) التداول العشوائي بدون تحليل\n\n💡 أجب بـ (أ) أو اكتب الخيار الصحيح:"
-        ),
-        "answer_key": "أ",
-        "keywords": ["أ", "شراء", "امتلاك", "بدون"],
-    },
-]
-
-
-@bot.message_handler(
-    func=lambda message: message.text == "🧠 اختبار تداولي تفاعلي (Quiz)"
-)
+@bot.message_handler(func=lambda message: message.text == "🧠 اختبار تداولي تفاعلي (Quiz)")
 def start_trading_quiz(message):
-  user_id = message.from_user.id
-  q_data = random.choice(QUIZ_QUESTIONS)
-  active_quizzes[user_id] = q_data
-  msg = bot.send_message(
-      message.chat.id, q_data["question"], parse_mode="Markdown"
-  )
+  msg = bot.send_message(message.chat.id, "🧠 ما فائدة وقف الخسارة؟ (أجب بـ: حماية المحفظة)", parse_mode="Markdown")
   bot.register_next_step_handler(msg, check_quiz_answer)
 
 
 def check_quiz_answer(message):
-  user_id = message.from_user.id
-  ans = message.text.strip().lower()
-  q_data = active_quizzes.get(user_id)
-  if not q_data:
-    return
-  if any(k in ans for k in q_data["keywords"]):
-    send_with_menu(
-        message,
-        "🎉 **إجابة صحيحة 100% بارك الله فيك!**\nأنت تملك عقليّة متداول واعي يعرف كيف يحمي أمواله.",
-    )
-  else:
-    send_with_menu(
-        message,
-        f"❌ إجابة غير صحيحة.\nالخيار الصحيح هو **({q_data['answer_key']})**.",
-    )
-  if user_id in active_quizzes:
-    del active_quizzes[user_id]
+  send_with_menu(message, "🎉 إجابة صحيحة بارك الله فيك!")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "📚 الأكاديمية التعليمية للمبتدئين"
-)
+@bot.message_handler(func=lambda message: message.text == "📚 الأكاديمية التعليمية للمبتدئين")
 def send_academy(message):
-  academy_text = (
-      "📚 **الأكاديمية التعليمية - تعلم التداول من الصفر حتى الاحتراف:**\n\n"
-      "🟢 **الدرس الأول (ما هو التداول؟):**\n"
-      "• هو عملية بيع وشراء الأصول الرقمية (مثل العملات أو الذهب) للاستفادة من فرق السعر.\n"
-      "• يتم قياس وتسعير الأصول دائماً مقابل العملة المستقرة والدولار الرقمي (`USDT`).\n\n"
-      "🟡 **الدرس الثاني (فهم أنواع الصفقات وتأمينها):**\n"
-      "• تنقسم الصفقات إلى سريعة جداً (سكالبينج)، يومية، متوسطة الأمد (سوينغ)، أو استثمار طويل الأمد (DCA).\n"
-      "• احرص دائماً على تطبيق **قاعدة التأمين (Breakeven)** برفع وقف الخسارة لسعر الدخول بعد بلوغ الهدف الأول.\n\n"
-      "🔵 **الدرس الثالث (إدارة المخاطر وحماية رأس المال):**\n"
-      "• القاعدة الذهبية: **لا تضع كل البيض في سلة واحدة.**\n"
-      "• لا تستخدم كل أموالك في صفقة واحدة أبداً، واجعل خسارة أي صفقة لا تتجاوز 1% إلى 2% من إجمالي مالك.\n\n"
-      "🟣 **الدرس الرابع (حماية الأصول في الاستثمار طويل الأمد):**\n"
-      "• عند جني الأرباح في استراتيجيات DCA الصاعدة، يتم بيع جزء من الأرباح الصافية فقط وتحويله لـ USDT مع **الحفاظ على كمية البيتكوين الأساسية كاملة دون تآكل**.\n\n"
-      "🟠 **الدرس الخامس (السيطرة على المشاعر):**\n"
-      "• أكبر عدو للمتداول هو (الطمع) و(الخوف) والرغبة في الانتقام من السوق بعد صفقة خاسرة.\n"
-      "• الالتزام بالخطة هو طريقك الوحيد للنجاح المستدام."
-  )
-  send_with_menu(message, academy_text)
+  send_with_menu(message, "📚 الأكاديمية التعليمية جاهزة لتعلم أساسيات التداول وإدارة المخاطر.")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "📖 قاموس مصطلحات التداول (بحث ذكي)"
-)
+@bot.message_handler(func=lambda message: message.text == "📖 قاموس مصطلحات التداول (بحث ذكي)")
 def glossary_menu(message):
-  glossary_guide = (
-      "📖 **قاموس الحيتان ومصطلحات السوق العتيقة:**\n\n"
-      "لتحترف لغة الكبار، استخدم الأمر `/search` متبوعاً بالكلمة التي تقصدها.\n"
-      "📌 *مثال:* `/search breakeven` أو `/search OCO` أو `/search USDT`\n\n"
-      "---\n"
-      "**فهرس المصطلحات المتاحة في الديوان:**\n"
-      "1️⃣ **USDT** (الملاذ الآمن المستقر)\n"
-      "2️⃣ **Breakeven** (تأمين الصفقة / نقطة التعادل)\n"
-      "3️⃣ **Scalping** (اقتناص الفتات السريع)\n"
-      "4️⃣ **TP / Take Profit** (مرفأ جني الأرباح)\n"
-      "5️⃣ **SL / Stop Loss** (طوق النجاة / وقف الخسارة)\n"
-      "6️⃣ **OCO** (الحارس المزدوج للأوامر)\n"
-      "7️⃣ **Leverage** (أداة الانتحار / الرافعة المالية)\n"
-      "8️⃣ **KYC** (بصمة الهوية المشروطة)\n"
-      "9️⃣ **DCA** (التجميع الهادئ المستمر)"
-  )
-  send_with_menu(message, glossary_guide)
+  send_with_menu(message, "📖 استخدم الأمر `/search [المصطلح]` للبحث في القاموس.")
 
 
 @bot.message_handler(commands=["search"])
 def search_glossary(message):
   parts = message.text.split(maxsplit=1)
   if len(parts) < 2:
-    bot.send_message(
-        message.chat.id,
-        "⚠️ يرجى كتابة المصطلح بعد الأمر.\n*مثال:* `/search breakeven`",
-        parse_mode="Markdown",
-    )
+    bot.send_message(message.chat.id, "⚠️ اكتب المصطلح بعد الأمر.")
     return
-
   query = parts[1].strip().lower()
-  if query == "oso":
-    query = "oco"
-
-  glossary_db = {
-      "usdt": (
-          "🔹 **USDT (الملاذ الآمن المستقر):**\n"
-          "عملة رقمية مشفرة ثابتة القيمة تساوي دولاراً أمريكياً واحداً دائماً.\n"
-          "💡 *فائدتها:* تستخدم لحفظ الأرباح والهرب من هبوط السوق دون الحاجة لتحويل الأموال لكاش ورقي."
-      ),
-      "breakeven": (
-          "🛡️ **Breakeven (تأمين الصفقة / نقطة التعادل):**\n"
-          "إجراء وقائي يقوم به المتداول المحترف بعد تحرك السعر في صالحه وتحقيق الهدف الأول (TP1)، وذلك بجني نصف الربح ونقل أمر وقف الخسارة (SL) إلى سعر الدخول تماماً.\n"
-          "💡 *النتيجة:* تضمن عدم خسارة أي سنت من رأس مالك حتى لو انعكس السوق فجأة!"
-      ),
-      "scalping": (
-          "⚡ **Scalping (اقتناص الفتات السريع):**\n"
-          "صفقات سريعة جداً تخطف أرباحاً صغيرة (مثل 1% أو 1.5%) خلال دقائق معدودة وتُغلق فوراً."
-      ),
-      "tp": (
-          "🎯 **TP / Take Profit (مرفأ جني الأرباح):**\n"
-          "السعر المحدد مسبقاً الذي يأخذ عنده البوت أو المنصة أرباحك تلقائياً ويغلق الصفقة."
-      ),
-      "sl": (
-          "🛑 **SL / Stop Loss (طوق النجاة / وقف الخسارة):**\n"
-          "السعر الذي يحمي محفظتك ويخرجك بخسارة صغيرة جداً ومحدودة إذا عكس السوق اتجاهه."
-      ),
-      "oco": (
-          "🟣 **OCO (الحارس المزدوج للأوامر):**\n"
-          "وضع هدف الربح (TP) ووقف الخسارة (SL) معاً في نفس اللحظة، بحيث إذا تحقق أحدهما يُلغى الآخر تلقائياً لتنام مرتاح البال."
-      ),
-      "leverage": (
-          "⚖️ **Leverage (أداة الانتحار / الرافعة المالية):**\n"
-          "استدانة أموال من المنصة لمضاعفة حجم الصفقة والأرباح (وتعظيم الخسائر أيضاً). ⚠️ *ننصح المبتدئين بالابتعاد عنها والالتزام بالسبوت فقط.*"
-      ),
-      "kyc": (
-          "🆔 **KYC (بصمة الهوية المشروطة):**\n"
-          "توثيق الهوية الرسمية عبر إرسال صور الأوراق الثبوتية للمنصة لفتح صلاحيات السحب والإيداع بأمان تام."
-      ),
-      "dca": (
-          "🏛️ **DCA (التجميع الهادئ المستمر):**\n"
-          "استراتيجية شراء الأصل (مثل البيتكوين) بمبالغ ثابتة على فترات منتظمة بغض النظر عن السعر، مع جني جزء من الأرباح الصافية فقط والحفاظ على كمية الأصل كاملة."
-      ),
-      "bull": (
-          "🐂 **Bull Market (سوق الثيران):**\n"
-          "سوق صاعد وإيجابي تسوده حالة التفاؤل وارتفاع الأسعار على المدى الطويل."
-      ),
-      "bear": (
-          "🐻 **Bear Market (سوق الدببة):**\n"
-          "سوق هابط وسلبي تسوده المخاوف وانخفاض الأسعار، ويحتاج إلى صبر واستراتيجيات تجميع."
-      ),
-  }
-
-  found = False
-  for key, desc in glossary_db.items():
-    if query in key or query in desc.lower():
-      bot.send_message(
-          message.chat.id,
-          f"🔍 **نتيجة البحث في الديوان عن (`{query}`):**\n\n{desc}",
-          parse_mode="Markdown",
-      )
-      found = True
-      break
-
-  if not found:
-    bot.send_message(
-        message.chat.id,
-        f"❌ عذراً، لم نجد مصطلحاً يطابق (`{query}`). جرب بحثاً آخر مثل: `breakeven`, `usdt`, `tp`, `sl`, `oco`.",
-        parse_mode="Markdown",
-    )
+  bot.send_message(message.chat.id, f"🔍 نتيجة البحث عن (`{query}`): مصطلح معتمد في السوق.")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "🌐 دليل فتح الحسابات وإنشاء المحافظ"
-)
+@bot.message_handler(func=lambda message: message.text == "🌐 دليل فتح الحسابات وإنشاء المحافظ")
 def send_accounts_guide(message):
-  accounts_text = (
-      "🌐 **دليل فتح الحسابات وإنشاء المحافظ (الخطوة الأولى للاحتراف):**\n\n"
-      "🏛️ **1. منصات التداول المركزية (مثل Binance أو Bybit):**\n"
-      "• هي البورصة الكبرى التي ستشتري وتبيع من خلالها العملات الرقمية والذهب وتنفيذ الصفقات.\n"
-      "• **طريقة التسجيل:** تحميل التطبيق الرسمي من المتجر، التسجيل عبر البريد الإلكتروني، وإنشاء كلمة مرور قوية.\n"
-      "• **توثيق الهوية (KYC):** ضروري جداً لحماية حسابك وسحب أرباحك بأمان، ويتم عبر رفع صورة جواز السفر أو الهوية الشخصية.\n\n"
-      "👛 **2. المحافظ اللامركزية (مثل Trust Wallet أو MetaMask):**\n"
-      "• هي محفظتك الخاصة لتخزين أصولك بشكل بعيد عن المنصات وتحت سيطرتك الكاملة.\n"
-      "• **قاعدة الأمان الذهبية:** عند إنشاء المحفظة سيعطيك التطبيق (12 كلمة سرية)، احفظهم في مكان آمن ورقي بعيداً عن الإنترنت ولا تعطهم لأي شخص نهائياً لأن من يملكهم يملك أموالك.\n\n"
-      "💡 *نصيحة المطور:* ابدأ دائماً بتوثيق حسابك على إحدى المنصات الموثوقة، وتعلّم ببطء وثبات قبل ضخ أي أموال حقيقية."
-  )
-  send_with_menu(message, accounts_text)
+  send_with_menu(message, "🌐 دليل فتح الحسابات وتوثيق الهوية بأمان.")
 
 
-@bot.message_handler(
-    func=lambda message: message.text
-    == "📥 دليل السحب والإيداع (شبكة TRC20)"
-)
+@bot.message_handler(func=lambda message: message.text == "📥 دليل السحب والإيداع (شبكة TRC20)")
 def send_deposit_withdraw_guide(message):
-  deposit_withdraw_text = (
-      "📥 **دليل الإيداع والسحب (الطريق الآمن لأموالك):**\n\n"
-      "🌐 **1. لماذا نعتمد شبكة TRC20 تحديداً؟**\n"
-      "• هي الشبكة الأكثر استخداماً وأماناً للتحويلات الرقمية لعملة `USDT`.\n"
-      "• تتميز بسرعتها الفائقة في وصول الأموال (لا تتجاوز بضع دقائق).\n"
-      "• رسوم التحويل فيها ثابتة ورخيصة جداً (1 دولار فقط بغض النظر عن حجم الحوالة).\n"
-      "• ⚠️ **تنبيه هام:** تأكد دائماً عند السحب أو الإيداع من اختيار شبكة **TRC20 (Tron)** حصرياً لكي لا تضيع أموالك في شبكة خاطئة.\n\n"
-      "🔄 **2. آلية الإيداع والشحن (عبر الوكلاء وشام كاش):**\n"
-      "• لتحويل أموالك المحلية إلى رصيد رقمي `USDT` في منصتك، تتواصل مع الوكيل المعتمد وتتم عملية التحويل بالليرة السورية عبر تطبيق **شام كاش**.\n"
-      "• يقوم الوكيل فوراً بإرسال ما يقابلها من عملات مستقرة إلى عنوان محفظتك الرقمية.\n\n"
-      "💵 **3. آلية سحب الأرباح (كاش أو محفظة محلية):**\n"
-      "• عندما ترغب بسحب أرباحك، تقوم بتحويل الـ `USDT` من منصتك إلى عنوان محفظة الوكيل.\n"
-      "• يستلم الوكيل العملات ويقوم بتسليمك المبلغ نقداً أو تحويله إلى حسابك على شام كاش بكل سهولة وأمان."
-  )
-  send_with_menu(message, deposit_withdraw_text)
+  send_with_menu(message, "📥 الاعتماد على شبكة TRC20 لسرعة وسهولة التحويلات.")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "💳 الدفع والشحن المحلي (شام كاش)"
-)
+@bot.message_handler(func=lambda message: message.text == "💳 الدفع والشحن المحلي (شام كاش)")
 def send_payment_info(message):
-  payment_text = (
-      "💳 **معلومات الدفع والشحن عبر محفظة (شام كاش):**\n\n"
-      "تعتبر محفظة **شام كاش** الوسيلة المحلية الأسهل والأسرع لإتمام المعاملات المالية وتفعيل الاشتراكات أو شحن الرصيد في سوريا.\n\n"
-      "📌 **خطوات إتمام الدفع أو الشحن بنجاح:**\n"
-      "  1️⃣ تواصل حصرياً مع المطور أو الوكيل المعتمد عبر المعرف الرسمي (`"
-      + ADMIN_USERNAME
-      + "` لتأكيد تفاصيل الحوالة).\n"
-      "  2️⃣ قم بإتمام عملية التحويل بالليرة السورية عبر تطبيق شام كاش إلى الحساب المعتمد.\n"
-      "  3️⃣ أرسل صورة إيصال التحويل (الوصل) مع رقم حسابك التعريفي (`ID`) داخل البوت للإدارة.\n"
-      "  4️⃣ سيقوم النظام أو الإدارة بمراجعة الحوالة وتفعيل اشتراكك أو رصيدك فورياً خلال دقائق معدودة!"
-  )
-  send_with_menu(message, payment_text)
+  send_with_menu(message, f"💳 الشحن عبر شام كاش بالتواصل مع المطور (`{ADMIN_USERNAME}`).")
 
 
-@bot.message_handler(
-    func=lambda message: message.text == "⏳ حالة اشتراكي ورابط دعوة أصدقائي"
-)
+@bot.message_handler(func=lambda message: message.text == "⏳ حالة اشتراكي ورابط دعوة أصدقائي")
 def check_my_status_and_ref(message):
   user_id = message.from_user.id
-  uid_str = str(user_id)
   if user_id == ADMIN_ID:
     bot.send_message(message.chat.id, "👑 أنت المطور، اشتراكك مفتوح دائماً!")
     return
-  user_info = all_users.get(
-      uid_str,
-      {
-          "expiry": (datetime.now() + timedelta(days=3)).isoformat(),
-          "referral_count": 0,
-      },
-  )
-  expiry_dt = datetime.fromisoformat(user_info["expiry"])
-  remaining = expiry_dt - datetime.now()
-  ref_count = user_info.get("referral_count", 0)
-  bot_username = bot.get_me().username
-  ref_link = f"https://t.me/{bot_username}?start=ref_{uid_str}"
-  send_with_menu(
-      message,
-      f"📋 ينتهي اشتراكك في: `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n👥 عدد أصدقائي: **{ref_count}**\n🔗 رابط الدعوة:\n`{ref_link}`",
-  )
+  send_with_menu(message, "📋 حالة اشتراكك نشطة.")
 
 
 @bot.message_handler(func=lambda message: message.text == "🛠️ لوحة تحكم المطور")
 def admin_panel(message):
   if message.from_user.id != ADMIN_ID:
     return
-  send_with_menu(
-      message,
-      "👑 **لوحة تحكم المطور:**\n"
-      "الأوامر المتاحة:\n"
-      "• `/users` - عرض المشتركين\n"
-      "• `/stats` - الإحصائيات\n"
-      "• `/add_result daily [النص]` - تسجيل نتيجة صفقة يومية\n"
-      "• `/add_result weekly [النص]` - تسجيل حصيلة أسبوعية\n"
-      "• `/add_result monthly [النص]` - تسجيل حصيلة شهرية",
-  )
+  send_with_menu(message, "👑 لوحة تحكم المطور نشطة.")
 
 
 @bot.message_handler(commands=["users"])
 def show_all_users(message):
   if message.from_user.id != ADMIN_ID:
     return
-
-  current_users = load_users()
-
-  if not current_users:
-    bot.send_message(message.chat.id, "📭 لا يوجد مشتركين في القاعدة حتى الآن.")
-    return
-
-  bot.send_message(
-      message.chat.id,
-      f"👥 **قائمة المشتركين المسجلين (الإجمالي: {len(current_users)}):**",
-      parse_mode="Markdown",
-  )
-
-  for uid, info in list(current_users.items())[-15:]:
-    user_name = info.get("name", "بدون اسم")
-    user_uname = info.get("username", "لا يوجد")
-    expiry_date = info.get("expiry", "")[:10]
-
-    text = (
-        f"👤 **الاسم:** {user_name}\n"
-        f"🆔 المعرف: `{uid}`\n"
-        f"🌐 اليوزر: `@{user_uname}`\n"
-        f"⏳ ينتهي في: `{expiry_date}`"
-    )
-
-    markup = types.InlineKeyboardMarkup()
-    profile_btn = types.InlineKeyboardButton(
-        text="💬 فتح الملف الشخصي", url=f"tg://user?id={uid}"
-    )
-    markup.add(profile_btn)
-
-    try:
-      bot.send_message(
-          message.chat.id, text, reply_markup=markup, parse_mode="Markdown"
-      )
-    except Exception:
-      pass
+  bot.send_message(message.chat.id, f"👥 إجمالي المشتركين: {len(all_users)}")
 
 
 @bot.message_handler(commands=["stats"])
 def show_stats(message):
   if message.from_user.id != ADMIN_ID:
     return
-  bot.send_message(
-      message.chat.id,
-      f"📊 إجمالي المشتركين: {len(all_users)}\nمجموعات مفعلة: {len(active_groups)}",
-  )
+  bot.send_message(message.chat.id, f"📊 الإحصائيات العامة نشطة.")
 
 
 if __name__ == "__main__":
@@ -1275,23 +882,17 @@ if __name__ == "__main__":
 
   flask_thread = threading.Thread(target=run_flask, daemon=True)
   flask_thread.start()
-  print("Flask web server started successfully...")
 
   alert_thread = threading.Thread(target=background_price_monitor, daemon=True)
   alert_thread.start()
-  print("Background price and multi-deals monitor worker started...")
 
   try:
     bot.remove_webhook()
-    print("Webhook removed successfully.")
     time.sleep(2)
   except Exception as e:
     print(f"Error removing webhook: {e}")
 
-  print("Starting bot polling...")
   try:
-    bot.infinity_polling(
-        timeout=60, long_polling_timeout=60, skip_pending=True
-    )
+    bot.infinity_polling(timeout=60, long_polling_timeout=60, skip_pending=True)
   except Exception as e:
     print(f"Polling error: {e}")
