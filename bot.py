@@ -31,7 +31,7 @@ ADMIN_USERNAME = "@alone123987"
 DATA_FILE = "users_data.json"
 GROUPS_FILE = "groups_data.json"
 RESULTS_FILE = "trading_results.json"
-ACTIVE_TRADES_FILE = "active_trades.json"  # ملف تتبع الصفقات النشطة تلقائياً
+ACTIVE_TRADES_FILE = "active_trades.json"
 banned_users = set()
 
 risk_calculator_sessions = {}
@@ -236,36 +236,82 @@ def calculate_profit_percentage(entry_price, target_price, direction="BUY"):
     return 0.0
 
 
-def get_dynamic_deal_data(symbol_id, default_price):
-  try:
-    url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol_id}&vs_currencies=usd&include_24hr_change=true"
-    response = requests.get(url, timeout=5)
-    if response.status_code == 200:
-      data = response.json()
-      price = float(data[symbol_id]["usd"])
-      change_24h = float(data[symbol_id]["usd_24h_change"])
+# --- تصميم الكيبورد السفلي الشامل ---
+def get_main_menu(user_id):
+  markup = types.ReplyKeyboardMarkup(
+      resize_keyboard=True, is_persistent=True, row_width=2
+  )
+  btn_golden = types.KeyboardButton("📊 صفقات القاعدة الذهبية للعملات")
+  btn_analytical = types.KeyboardButton("📊 صفقات الرؤية التحليلية للعملات")
+  btn_gold_golden = types.KeyboardButton("🟡 صفقات الذهب (القاعدة الذهبية)")
+  btn_gold_analytical = types.KeyboardButton("🟡 صفقات الذهب (الرؤية التحليلية)")
+  btn_results = types.KeyboardButton(
+      "📈 نتائج وأداء الصفقات المقترحة (يومي/أسبوعي/شهري)"
+  )
+  btn_calc = types.KeyboardButton("🧮 حاسبة المخاطر وحجم الصفقة")
+  btn_alerts = types.KeyboardButton("🔔 ضبط تنبيه سعر مخصص (/alert)")
+  btn_news = types.KeyboardButton("📰 موجز الأخبار الاقتصادية اللحظية")
+  btn_quiz = types.KeyboardButton("🧠 اختبار تداولي تفاعلي (Quiz)")
+  btn3 = types.KeyboardButton("📚 الأكاديمية التعليمية للمبتدئين")
+  btn_glossary = types.KeyboardButton("📖 قاموس مصطلحات التداول (بحث ذكي)")
+  btn4 = types.KeyboardButton("🌐 دليل فتح الحسابات وإنشاء المحافظ")
+  btn5 = types.KeyboardButton("📥 دليل السحب والإيداع (شبكة TRC20)")
+  btn6 = types.KeyboardButton("💳 الدفع والشحن المحلي (شام كاش)")
+  btn7 = types.KeyboardButton("⏳ حالة اشتراكي ورابط دعوة أصدقائي")
 
-      if change_24h > 0:
-        trend_status = "🚀 زخم صاعد (Bullish Momentum)"
-        tp1_pct = 0.012
-        tp2_pct = 0.025
-        sl_pct = 0.01
-      else:
-        trend_status = "🔻 ضغط بيعي / تصحيح (Bearish Pressure)"
-        tp1_pct = 0.008
-        tp2_pct = 0.015
-        sl_pct = 0.008
+  if user_id == ADMIN_ID:
+    btn_admin = types.KeyboardButton("🛠️ لوحة تحكم المطور")
+    markup.add(
+        btn_golden,
+        btn_analytical,
+        btn_gold_golden,
+        btn_gold_analytical,
+        btn_results,
+        btn_calc,
+        btn_alerts,
+        btn_news,
+        btn_quiz,
+        btn3,
+        btn_glossary,
+        btn4,
+        btn5,
+        btn6,
+        btn7,
+        btn_admin,
+    )
+  else:
+    markup.add(
+        btn_golden,
+        btn_analytical,
+        btn_gold_golden,
+        btn_gold_analytical,
+        btn_results,
+        btn_calc,
+        btn_alerts,
+        btn_news,
+        btn_quiz,
+        btn3,
+        btn_glossary,
+        btn4,
+        btn5,
+        btn6,
+        btn7,
+    )
+  return markup
 
-      return price, change_24h, trend_status, tp1_pct, tp2_pct, sl_pct
-  except Exception:
-    pass
-  return default_price, 0.0, "⚖️ استقرار جانبي (Consolidation)", 0.01, 0.02, 0.01
+
+def send_with_menu(message, text):
+  bot.send_message(
+      message.chat.id,
+      text,
+      reply_markup=get_main_menu(message.from_user.id),
+      parse_mode="Markdown",
+  )
 
 
 # --- نظام أتمتة وتسجيل الصفقات النشطة تلقائياً ---
 def register_trade_automatically(asset_name, entry, tp1, tp2, sl):
   trades = load_active_trades()
-  # منع تكرار نفس الصفقة النشطة لنفس الأصل إذا كانت قيد التتبع
   for t in trades:
     if t["asset"] == asset_name and t["status"] == "active":
       return
@@ -287,7 +333,6 @@ def register_trade_automatically(asset_name, entry, tp1, tp2, sl):
 def background_trade_and_price_monitor():
   while True:
     try:
-      # أولاً: تتبع الصفقات النشطة وتقييمها تلقائياً
       trades = load_active_trades()
       if trades:
         btc_p, eth_p, xrp_p = get_crypto_prices()
@@ -318,21 +363,18 @@ def background_trade_and_price_monitor():
           sl = trade["sl"]
 
           result_text = None
-          # فحص ضرب وقف الخسارة
           if cur_price <= sl:
             trade["status"] = "closed"
             result_text = (
                 f"❌ صفقة {asset} مغلقة بضرب وقف الخسارة SL عند `{cur_price:,.2f}`"
             )
             results["daily"].append(result_text)
-          # فحص تحقيق الهدف الثاني TP2
           elif cur_price >= tp2:
             trade["status"] = "closed"
             result_text = (
                 f"✅ صفقة {asset} حققت الهدف الثاني TP2 بنجاح عند `{cur_price:,.2f}` 🚀"
             )
             results["daily"].append(result_text)
-          # فحص تحقيق الهدف الأول TP1 والتأمين
           elif cur_price >= tp1 and not trade["secured"]:
             trade["secured"] = True
             result_text = (
@@ -347,7 +389,6 @@ def background_trade_and_price_monitor():
 
         save_active_trades(updated_trades)
 
-      # ثانياً: تتبع التنبيهات المخصصة للمستخدمين
       if custom_alerts:
         btc_p, eth_p, xrp_p = get_crypto_prices()
         gold_p = get_gold_price()
@@ -361,7 +402,6 @@ def background_trade_and_price_monitor():
             asset = alert["asset"]
             target = alert["price"]
             current_price = prices_map.get(asset, 0)
-
             triggered = current_price >= target if current_price > 0 else False
 
             if triggered:
@@ -450,28 +490,12 @@ def send_welcome(message):
         pass
     welcome_text = (
         "🎉 أهلاً بك في بوت التداول الذكي والشامل! 🤖\n\n"
-        "🎁 تم تفعيل فترة تجريبية مجانية لمدة 3 أيام لحسابك بنجاح.\n\n"
-        "📋 **قائمة الأوامر المتاحة:**\n"
-        "• `/deals` - صفقات القاعدة الذهبية للعملات\n"
-        "• `/analysis` - صفقات الرؤية التحليلية\n"
-        "• `/gold` - صفقات الذهب\n"
-        "• `/results` - سجل نتائج الأداء والصفقات المقترحة تلقائياً (يومي/أسبوعي/شهري)\n"
-        "• `/calc` - حاسبة المخاطر\n"
-        "• `/news` - موجز الأخبار الاقتصادية\n"
-        "• `/academy` - الأكاديمية التعليمية للمبتدئين\n"
-        "• `/glossary` - قاموس المصطلحات (بحث ذكي)\n"
-        "• `/status` - حالة اشتراكي ورابط الدعوة\n"
-        "• `/help` - دليل الاستخدام"
+        "🎁 تم تفعيل فترة تجريبية مجانية لمدة 3 أيام لحسابك بنجاح.\n"
+        "اختر ما تحتاجه من الأزرار أدناه:"
     )
   else:
     if user_id == ADMIN_ID:
-      welcome_text = (
-          "👑 أهلاً بك يا مهندس أحمد! البوت يعمل بدون أزرار مزعجة وبنظام تتبع ذاتي.\n\n"
-          "🛠️ **أوامر لوحة التحكم للمطور:**\n"
-          "• `/users` - عرض المشتركين\n"
-          "• `/stats` - الإحصائيات\n"
-          "• `/add_result daily [النص]` - تسجيل نتيجة يدوية إضافية"
-      )
+      welcome_text = "👑 أهلاً بك يا مهندس أحمد! البوت بكامل أزراره وميزاته جاهز:"
     else:
       expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
       remaining = expiry_dt - datetime.now()
@@ -479,34 +503,22 @@ def send_welcome(message):
       hours_left = max(0, remaining.seconds // 3600)
       welcome_text = (
           "أهلاً بك مجدداً يا مهندس! حسابك مسجل في النظام.\n\n"
-          f"✅ حالة اشتراكك: نشط (المتبقي: {days_left} يوم و {hours_left} ساعة)\n\n"
-          "📋 استخدم الأوامر المباشرة للوصول لكل ميزات البوت (اكتب `/help` لعرض القائمة)."
+          f"✅ حالة اشتراكك: نشط (المتبقي: {days_left} يوم و {hours_left} ساعة)\n"
+          "اختر ما تحتاجه من الأزرار أدناه:"
       )
 
-  bot.send_message(message.chat.id, welcome_text, parse_mode="Markdown")
-
-
-@bot.message_handler(commands=["help"])
-def send_help(message):
-  help_text = (
-      "📋 **دليل أوامر البوت المباشرة:**\n\n"
-      "• `/deals` - صفقات القاعدة الذهبية للعملات (تثبيت تلقائي للتتبع)[span_0](start_span)[span_0](end_span)\n"
-      "• `/analysis` - صفقات الرؤية التحليلية والزخم (تثبيت تلقائي للتتبع)[span_1](start_span)[span_1](end_span)\n"
-      "• `/gold` - صفقات الذهب (تثبيت تلقائي للتتبع)[span_2](start_span)[span_2](end_span)\n"
-      "• `/results` - سجل نتائج وأداء الصفقات المقترحة تلقائياً (يومي، أسبوعي، شهري)[span_3](start_span)[span_3](end_span)\n"
-      "• `/calc` - حاسبة إدارة المخاطر وحجم الصفقة[span_4](start_span)[span_4](end_span)\n"
-      "• `/alert [asset] [price]` - ضبط تنبيه سعر مخصص[span_5](start_span)[span_5](end_span)\n"
-      "• `/news` - موجز الأخبار الاقتصادية اللحظية[span_6](start_span)[span_6](end_span)\n"
-      "• `/quiz` - اختبار تداولي تفاعلي[span_7](start_span)[span_7](end_span)\n"
-      "• `/academy` - الأكاديمية التعليمية للمبتدئين[span_8](start_span)[span_8](end_span)\n"
-      "• `/search [term]` - بحث ذكي في قاموس مصطلحات التداول[span_9](start_span)[span_9](end_span)\n"
-      "• `/accounts` - دليل فتح الحسابات وإنشاء المحافظ[span_10](start_span)[span_10](end_span)\n"
-      "• `/deposit` - دليل السحب والإيداع (شبكة TRC20 وشام كاش)[span_11](start_span)[span_11](end_span)\n"
-      "• `/status` - حالة اشتراكي ورابط دعوة أصدقائي[span_12](start_span)[span_12](end_span)"
+  bot.send_message(
+      message.chat.id,
+      welcome_text,
+      reply_markup=get_main_menu(user_id),
+      parse_mode="Markdown",
   )
-  bot.send_message(message.chat.id, help_text, parse_mode="Markdown")
 
 
+# --- معالجات أزرار الكيبورد السفلي والأوامر المباشرة ---
+@bot.message_handler(
+    func=lambda message: message.text == "📈 نتائج وأداء الصفقات المقترحة (يومي/أسبوعي/شهري)"
+)
 @bot.message_handler(commands=["results"])
 def show_trading_results_report(message):
   results = load_results()
@@ -532,7 +544,7 @@ def show_trading_results_report(message):
       f"{format_items(monthly_list)}\n"
       "💡 *ملاحظة:* يتابع البوت الأسعار حياً ويسجل الأهداف والوقف والتأمين تلقائياً فور تحققها."
   )
-  bot.send_message(message.chat.id, report_text, parse_mode="Markdown")
+  send_with_menu(message, report_text)
 
 
 @bot.message_handler(commands=["add_result"])
@@ -570,14 +582,22 @@ def add_trading_result_cmd(message):
     )
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "📊 صفقات القاعدة الذهبية للعملات"
+)
 @bot.message_handler(commands=["deals"])
 def send_golden_rule_deals(message):
   btc, eth, xrp = get_crypto_prices()
 
-  # تسجيل الصفقات تلقائياً في نظام التتبّع الخلفي
-  register_trade_automatically("BTC/USDT", btc, btc * 1.012, btc * 1.025, btc * (1 - 0.012))
-  register_trade_automatically("ETH/USDT", eth, eth * 1.03, eth * 1.06, eth * (1 - 0.012))
-  register_trade_automatically("XRP/USDT", xrp, xrp * 1.008, xrp * 1.015, xrp * (1 - 0.012))
+  register_trade_automatically(
+      "BTC/USDT", btc, btc * 1.012, btc * 1.025, btc * (1 - 0.012)
+  )
+  register_trade_automatically(
+      "ETH/USDT", eth, eth * 1.03, eth * 1.06, eth * (1 - 0.012)
+  )
+  register_trade_automatically(
+      "XRP/USDT", xrp, xrp * 1.008, xrp * 1.015, xrp * (1 - 0.012)
+  )
 
   xrp_tp1_pct = calculate_profit_percentage(xrp, xrp * 1.008, "BUY")
   xrp_tp2_pct = calculate_profit_percentage(xrp, xrp * 1.015, "BUY")
@@ -608,7 +628,7 @@ def send_golden_rule_deals(message):
       f"  🎯 *الهدف الأول (TP1):* `{eth * 1.03:,.2f}` ──> **(+{eth_tp1_pct}%)**\n"
       f"  🚀 *الهدف الثاني (TP2):* `{eth * 1.06:,.2f}` ──> **(+{eth_tp2_pct}%)**"
   )
-  bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
+  send_with_menu(message, deals_text)
 
   chart_buf = generate_price_chart(btc)
   if chart_buf:
@@ -619,6 +639,9 @@ def send_golden_rule_deals(message):
     )
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "📊 صفقات الرؤية التحليلية للعملات"
+)
 @bot.message_handler(commands=["analysis"])
 def send_analytical_vision_deals(message):
   btc_price, btc_chg, btc_trend, btc_tp1_p, btc_tp2_p, btc_sl_p = (
@@ -631,10 +654,27 @@ def send_analytical_vision_deals(message):
       get_dynamic_deal_data("ripple", 0.52)
   )
 
-  # تثبيت الصفقات التحليلية في نظام التتبع
-  register_trade_automatically("BTC/USDT", btc_price, btc_price * (1 + btc_tp1_p), btc_price * (1 + btc_tp2_p), btc_price * (1 - btc_sl_p))
-  register_trade_automatically("ETH/USDT", eth_price, eth_price * (1 + eth_tp1_p), eth_price * (1 + eth_tp2_p), eth_price * (1 - eth_sl_p))
-  register_trade_automatically("XRP/USDT", xrp_price, xrp_price * (1 + xrp_tp1_p), xrp_price * (1 + xrp_tp2_p), xrp_price * (1 - xrp_sl_p))
+  register_trade_automatically(
+      "BTC/USDT",
+      btc_price,
+      btc_price * (1 + btc_tp1_p),
+      btc_price * (1 + btc_tp2_p),
+      btc_price * (1 - btc_sl_p),
+  )
+  register_trade_automatically(
+      "ETH/USDT",
+      eth_price,
+      eth_price * (1 + eth_tp1_p),
+      eth_price * (1 + eth_tp2_p),
+      eth_price * (1 - eth_sl_p),
+  )
+  register_trade_automatically(
+      "XRP/USDT",
+      xrp_price,
+      xrp_price * (1 + xrp_tp1_p),
+      xrp_price * (1 + xrp_tp2_p),
+      xrp_price * (1 - xrp_sl_p),
+  )
 
   deals_text = (
       "📊 **صفقات الرؤية التحليلية وقراءة الزخم الحي (مثبتة للتتبع):**\n\n"
@@ -651,9 +691,12 @@ def send_analytical_vision_deals(message):
       f"• الحالة: {xrp_trend}\n"
       f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.2f}` | 🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.2f}`"
   )
-  bot.send_message(message.chat.id, deals_text, parse_mode="Markdown")
+  send_with_menu(message, deals_text)
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)"
+)
 @bot.message_handler(commands=["gold"])
 def send_gold_golden_rule(message):
   current_gold = get_gold_price()
@@ -661,20 +704,48 @@ def send_gold_golden_rule(message):
   tp2_price = current_gold * (1 + 0.015)
   sl_price = current_gold * (1 - 0.01)
 
-  # تثبيت صفقة الذهب للتتبع التلقائي
-  register_trade_automatically("GOLD (XAUUSD)", current_gold, tp1_price, tp2_price, sl_price)
+  register_trade_automatically(
+      "GOLD (XAUUSD)", current_gold, tp1_price, tp2_price, sl_price
+  )
 
   gold_text = (
-      "🟡 **توصيات صفقات الذهب الحية (مثبتة للتتبع التلقائي):**\n\n"
+      "🟡 **توصيات صفقات الذهب (القاعدة الذهبية - مثبتة للتتبع):**\n\n"
       f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
       f"🛑 **وقف الخسارة المقترح (SL):** `{sl_price:,.2f}` $ (-1.0%)\n"
       f"🎯 **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ (+0.7%)\n"
       f"🚀 **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ (+1.5%)\n"
       "🛡️ *التأمين:* يتابعه البوت ويرفع الـ SL لسعر الدخول تلقائياً عند بلوغ TP1."
   )
-  bot.send_message(message.chat.id, gold_text, parse_mode="Markdown")
+  send_with_menu(message, gold_text)
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "🟡 صفقات الذهب (الرؤية التحليلية)"
+)
+def send_gold_analytical_vision(message):
+  current_gold = get_gold_price()
+  tp1_price = current_gold * (1 + 0.01)
+  tp2_price = current_gold * (1 + 0.022)
+  sl_price = current_gold * (1 - 0.012)
+
+  register_trade_automatically(
+      "GOLD (XAUUSD)", current_gold, tp1_price, tp2_price, sl_price
+  )
+
+  gold_text = (
+      "🟡 **توصيات صفقات الذهب (الرؤية التحليلية - مثبتة للتتبع):**\n\n"
+      f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
+      f"🚀 **حالة السوق:** رصد سيولة شرائية وتذبذب إيجابي.\n"
+      f"🛑 **وقف الخسارة (SL):** `{sl_price:,.2f}` $ (-1.2%)\n"
+      f"🎯 **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ (+1.0%)\n"
+      f"🚀 **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ (+2.2%)"
+  )
+  send_with_menu(message, gold_text)
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "🧮 حاسبة المخاطر وحجم الصفقة"
+)
 @bot.message_handler(commands=["calc"])
 def start_risk_calculator(message):
   user_id = message.from_user.id
@@ -716,21 +787,23 @@ def process_risk_step(message):
         f"🎯 نسبة المخاطرة: `{risk_pct}%`\n"
         f"🛑 أقصى مبلغ للخسارة: **`{max_loss:.2f}` USDT**"
     )
-    bot.send_message(message.chat.id, result_text, parse_mode="Markdown")
+    send_with_menu(message, result_text)
     if user_id in risk_calculator_sessions:
       del risk_calculator_sessions[user_id]
   except Exception:
-    bot.send_message(message.chat.id, "⚠️ حدث خطأ. أعد المحاولة عبر الأمر `/calc`.")
+    bot.send_message(message.chat.id, "⚠️ حدث خطأ. أعد المحاولة من الكيبورد.")
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "🔔 ضبط تنبيه سعر مخصص (/alert)"
+)
 @bot.message_handler(commands=["alert"])
 def set_custom_alert(message):
   parts = message.text.split()
   if len(parts) < 3:
-    bot.send_message(
-        message.chat.id,
-        "⚠️ الصيغة الصحيحة:\n`/alert btc 68000` أو `/alert gold 4000`",
-        parse_mode="Markdown",
+    send_with_menu(
+        message,
+        "⚠️ الصيغة الصحيحة عبر الأمر:\n`/alert btc 68000` أو `/alert gold 4000`",
     )
     return
   asset = parts[1].replace("/", "").replace("USDT", "").upper()
@@ -740,15 +813,17 @@ def set_custom_alert(message):
     if user_id not in custom_alerts:
       custom_alerts[user_id] = []
     custom_alerts[user_id].append({"asset": asset, "price": target_price})
-    bot.send_message(
-        message.chat.id,
+    send_with_menu(
+        message,
         f"✅ تم ضبط التنبيه للعملة `{asset}` عند سعر `{target_price:,.2f}`",
-        parse_mode="Markdown",
     )
   except Exception:
-    bot.send_message(message.chat.id, "⚠️ خطأ في كتابة السعر.")
+    send_with_menu(message, "⚠️ خطأ في كتابة السعر.")
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "📰 موجز الأخبار الاقتصادية اللحظية"
+)
 @bot.message_handler(commands=["news"])
 def send_crypto_news(message):
   news_text = (
@@ -757,7 +832,7 @@ def send_crypto_news(message):
       "2️⃣ **العملات الرقمية:** استقرار تدفقات (ETFs) يدعم البيتكوين.\n"
       "3️⃣ **الذهب (XAUUSD):** التوترات والسياسة النقدية تقود حركة الأوقية."
   )
-  bot.send_message(message.chat.id, news_text, parse_mode="Markdown")
+  send_with_menu(message, news_text)
 
 
 QUIZ_QUESTIONS = [
@@ -771,6 +846,9 @@ QUIZ_QUESTIONS = [
 ]
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "🧠 اختبار تداولي تفاعلي (Quiz)"
+)
 @bot.message_handler(commands=["quiz"])
 def start_trading_quiz(message):
   user_id = message.from_user.id
@@ -789,21 +867,22 @@ def check_quiz_answer(message):
   if not q_data:
     return
   if any(k in ans for k in q_data["keywords"]):
-    bot.send_message(
-        message.chat.id,
+    send_with_menu(
+        message,
         "🎉 **إجابة صحيحة 100%!** أنت تملك عقلية متداول واعي.",
-        parse_mode="Markdown",
     )
   else:
-    bot.send_message(
-        message.chat.id,
+    send_with_menu(
+        message,
         f"❌ إجابة غير صحيحة. الخيار الصحيح هو **({q_data['answer_key']})**.",
-        parse_mode="Markdown",
     )
   if user_id in active_quizzes:
     del active_quizzes[user_id]
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "📚 الأكاديمية التعليمية للمبتدئين"
+)
 @bot.message_handler(commands=["academy"])
 def send_academy(message):
   academy_text = (
@@ -812,17 +891,29 @@ def send_academy(message):
       "• **الدرس الثاني:** تطبيق قاعدة التأمين (Breakeven) لحماية رأس المال.\n"
       "• **الدرس الثالث:** إدارة المخاطر وألا تتجاوز خسارة الصفقة 1%."
   )
-  bot.send_message(message.chat.id, academy_text, parse_mode="Markdown")
+  send_with_menu(message, academy_text)
+
+
+@bot.message_handler(
+    func=lambda message: message.text
+    == "📖 قاموس مصطلحات التداول (بحث ذكي)"
+)
+@bot.message_handler(commands=["glossary"])
+def glossary_menu(message):
+  glossary_guide = (
+      "📖 **قاموس الحيتان ومصطلحات السوق:**\n\n"
+      "استخدم الأمر `/search` متبوعاً بالمصطلح.\n"
+      "📌 *مثال:* `/search breakeven` أو `/search usdt`"
+  )
+  send_with_menu(message, glossary_guide)
 
 
 @bot.message_handler(commands=["search"])
 def search_glossary(message):
   parts = message.text.split(maxsplit=1)
   if len(parts) < 2:
-    bot.send_message(
-        message.chat.id,
-        "⚠️ يرجى كتابة المصطلح بعد الأمر. مثال: `/search breakeven`",
-        parse_mode="Markdown",
+    send_with_menu(
+        message, "⚠️ يرجى كتابة المصطلح بعد الأمر. مثال: `/search breakeven`"
     )
     return
   query = parts[1].strip().lower()
@@ -834,39 +925,52 @@ def search_glossary(message):
   desc = glossary_db.get(
       query, "❌ عذراً، لم يتم العثور على المصطلح في القاموس."
   )
-  bot.send_message(
-      message.chat.id,
-      f"🔍 **بحث (`{query}`):**\n\n{desc}",
-      parse_mode="Markdown",
-  )
+  send_with_menu(message, f"🔍 **بحث (`{query}`):**\n\n{desc}")
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "🌐 دليل فتح الحسابات وإنشاء المحافظ"
+)
 @bot.message_handler(commands=["accounts"])
 def send_accounts_guide(message):
-  bot.send_message(
-      message.chat.id,
+  send_with_menu(
+      message,
       "🌐 **دليل فتح الحسابات:** استخدم منصات مركزية موثوقة (مثل Binance أو Bybit) مع توثيق الهوية (KYC).",
-      parse_mode="Markdown",
   )
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "📥 دليل السحب والإيداع (شبكة TRC20)"
+)
 @bot.message_handler(commands=["deposit"])
 def send_deposit_withdraw_guide(message):
-  bot.send_message(
-      message.chat.id,
+  send_with_menu(
+      message,
       "📥 **دليل السحب والإيداع:** الاعتماد على شبكة TRC20 للتحويلات الرقمية السريعة والرخيصة، وشحن الرصيد المحلي عبر شام كاش.",
-      parse_mode="Markdown",
   )
 
 
+@bot.message_handler(
+    func=lambda message: message.text == "💳 الدفع والشحن المحلي (شام كاش)"
+)
+def send_payment_info(message):
+  send_with_menu(
+      message,
+      "💳 **الدفع والشحن المحلي:** تواصل مع المطور (`"
+      + ADMIN_USERNAME
+      + "`) لإتمام الحوالة عبر شام كاش وتفعيل اشتراكك.",
+  )
+
+
+@bot.message_handler(
+    func=lambda message: message.text == "⏳ حالة اشتراكي ورابط دعوة أصدقائي"
+)
 @bot.message_handler(commands=["status"])
 def check_my_status_and_ref(message):
   user_id = message.from_user.id
   uid_str = str(user_id)
   if user_id == ADMIN_ID:
-    bot.send_message(
-        message.chat.id, "👑 أنت المطور، اشتراكك مفتوح دائماً!", parse_mode="Markdown"
-    )
+    send_with_menu(message, "👑 أنت المطور، اشتراكك مفتوح دائماً!")
     return
   user_info = all_users.get(
       uid_str,
@@ -879,15 +983,15 @@ def check_my_status_and_ref(message):
   ref_count = user_info.get("referral_count", 0)
   bot_username = bot.get_me().username
   ref_link = f"https://t.me/{bot_username}?start=ref_{uid_str}"
-  bot.send_message(
-      message.chat.id,
+  send_with_menu(
+      message,
       f"📋 ينتهي اشتراكك في: `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n"
       f"👥 عدد أصدقائي: **{ref_count}**\n"
       f"🔗 رابط الدعوة:\n`{ref_link}`",
-      parse_mode="Markdown",
   )
 
 
+@bot.message_handler(func=lambda message: message.text == "🛠️ لوحة تحكم المطور")
 @bot.message_handler(commands=["users"])
 def show_all_users(message):
   if message.from_user.id != ADMIN_ID:
@@ -926,8 +1030,9 @@ if __name__ == "__main__":
   flask_thread.start()
   print("Flask web server started successfully...")
 
-  # تشغيل عامل التتبع المزدوج (للأسعار + أتمتة الصفقات وتحديث نتائجها حياً)
-  monitor_thread = threading.Thread(target=background_trade_and_price_monitor, daemon=True)
+  monitor_thread = threading.Thread(
+      target=background_trade_and_price_monitor, daemon=True
+  )
   monitor_thread.start()
   print("Background trade and price monitor worker started...")
 
