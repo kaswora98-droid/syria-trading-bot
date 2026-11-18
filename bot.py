@@ -33,7 +33,7 @@ active_quizzes = {}
 app = Flask(__name__)
 
 
-# --- دوال حفظ واسترجاع البيانات مع الحماية الجذرية ---
+# --- دوال حفظ واسترجاع البيانات ---
 def load_users():
   if os.path.exists(DATA_FILE):
     try:
@@ -77,6 +77,7 @@ all_users = load_users()
 active_groups = load_groups()
 
 
+# --- مسارات سيرفر الويب لترضاء منصة Render وتمنع خطأ البورت ---
 @app.route("/")
 def home():
   return "Ultimate Trading Bot is running 24/7!"
@@ -163,7 +164,6 @@ def generate_price_chart(btc_price):
     return None
 
 
-# --- دالة حساب نسبة الربح المئوية للصفقة ---
 def calculate_profit_percentage(entry_price, target_price, direction="BUY"):
   try:
     entry = float(entry_price)
@@ -177,7 +177,6 @@ def calculate_profit_percentage(entry_price, target_price, direction="BUY"):
     return 0.0
 
 
-# --- دالة تحليل السوق الحقيقي للرؤية التحليلية ---
 def get_dynamic_deal_data(symbol_id, default_price):
   try:
     url = f"https://api.coingecko.com/api/v3/simple/price?ids={symbol_id}&vs_currencies=usd&include_24hr_change=true"
@@ -204,7 +203,7 @@ def get_dynamic_deal_data(symbol_id, default_price):
   return default_price, 0.0, "⚖️ استقرار جانبي (Consolidation)", 0.01, 0.02, 0.01
 
 
-# --- القائمة الرئيسية مع الأزرار الكاملة ---
+# --- القائمة الرئيسية ---
 def get_main_menu(user_id):
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
@@ -358,7 +357,6 @@ def send_with_menu(message, text):
   )
 
 
-# --- صفقات القاعدة الذهبية للعملات ---
 @bot.message_handler(func=lambda message: message.text == "📊 صفقات القاعدة الذهبية")
 def send_golden_rule_deals(message):
   btc, eth, xrp = get_crypto_prices()
@@ -411,7 +409,6 @@ def send_golden_rule_deals(message):
     )
 
 
-# --- صفقات الرؤية التحليلية ---
 @bot.message_handler(func=lambda message: message.text == "📊 صفقات الرؤية التحليلية")
 def send_analytical_vision_deals(message):
   btc_price, btc_chg, btc_trend, btc_tp1_p, btc_tp2_p, btc_sl_p = (
@@ -449,7 +446,6 @@ def send_analytical_vision_deals(message):
   send_with_menu(message, deals_text)
 
 
-# --- صفقات الذهب (القاعدة الذهبية) ---
 @bot.message_handler(
     func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)"
 )
@@ -473,7 +469,6 @@ def send_gold_golden_rule(message):
   send_with_menu(message, gold_text)
 
 
-# --- صفقات الذهب (الرؤية التحليلية) ---
 @bot.message_handler(
     func=lambda message: message.text == "🟡 صفقات الذهب (الرؤية التحليلية)"
 )
@@ -583,7 +578,6 @@ def set_custom_alert(message):
     bot.send_message(message.chat.id, "⚠️ خطأ في كتابة السعر.")
 
 
-# --- مراقب الأسعار في الخلفية ---
 def background_price_monitor():
   while True:
     try:
@@ -814,7 +808,7 @@ def show_stats(message):
 
 
 if __name__ == "__main__":
-  # تشغيل سيرفر الويب الوهمي لـ Render لمنع خطأ Port Scan
+  # خيط سيرفر الويب الضروري لخدمات الويب على Render
   flask_thread = threading.Thread(target=run_flask, daemon=True)
   flask_thread.start()
   print("Flask web server started successfully...")
