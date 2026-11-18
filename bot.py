@@ -345,6 +345,7 @@ def send_welcome(message):
     except Exception:
       pass
 
+  # التحقق مما إذا كان المستخدم مسجلاً من قبل لمنع تكرار التجربة عند مسح الدردشة
   if uid_str not in all_users:
     expiry_date = datetime.now() + timedelta(days=3)
     user_name = message.from_user.first_name or "بدون اسم"
@@ -388,12 +389,14 @@ def send_welcome(message):
         bot.send_message(ADMIN_ID, admin_alert_text, parse_mode="Markdown")
       except Exception:
         pass
+        
     welcome_text = (
         "🎉 أهلاً بك في بوت التداول الذكي والشامل! 🤖\n\n"
         "🎁 تم تفعيل فترة تجريبية مجانية لمدة 3 أيام لحسابك بنجاح.\n"
         "اختر ما تحتاجه من الأزرار أدناه:"
     )
   else:
+    # المستخدم مسجل مسبقاً، لا يتم منحه فترة تجريبية جديدة أبداً
     if user_id == ADMIN_ID:
       welcome_text = "👑 أهلاً بك يا مهندس أحمد! البوت بكامل ميزاته جاهز:"
     else:
