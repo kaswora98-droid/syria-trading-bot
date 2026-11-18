@@ -494,7 +494,6 @@ def send_golden_rule_deals(message):
   user_id = str(message.from_user.id)
   btc, eth, xrp = get_crypto_prices()
 
-  # تحديث التثبيت بإضافة نوع فرعي لكي لا يتم مسح الأنواع الأخرى
   tracked = load_tracked_deals()
   if user_id not in tracked:
     tracked[user_id] = {}
@@ -785,7 +784,7 @@ def set_custom_alert(message):
     bot.send_message(message.chat.id, "⚠️ خطأ في كتابة السعر.")
 
 
-# --- حلقة المراقبة الآلية المدمجة في الخلفية لتتبع كافة صفقات المستخدم بالتوازي ---
+# --- حلقة المراقبة الآلية المدمجة في الخلفية لتتبع كافة صفقات المستخدم بالتوازي مع الترحيل التلقائي للنتائج ---
 def background_price_monitor():
   while True:
     try:
@@ -840,6 +839,8 @@ def background_price_monitor():
                   if tp1 > 0 and current_val >= tp1:
                     data["status"] = "tp1_hit"
                     updated = True
+                    
+                    # 1. إرسال إشعار فوري للمستخدم
                     try:
                       bot.send_message(
                           int(user_id),
@@ -852,10 +853,21 @@ def background_price_monitor():
                       )
                     except Exception:
                       pass
+                    
+                    # 2. الترحيل التلقائي لسجل الأداء العام ليظهر للمشتركين
+                    try:
+                      results_db = load_results()
+                      res_msg = f"✅ صفقة {symbol} تحقيق الهدف (TP1) بنجاح عند سعر {current_val:,.2f}"
+                      results_db["daily"].append(res_msg)
+                      save_results(results_db)
+                    except Exception:
+                      pass
                   
                   elif sl > 0 and current_val <= sl:
                     data["status"] = "sl_hit"
                     updated = True
+                    
+                    # 1. إرسال إشعار فوري للمستخدم
                     try:
                       bot.send_message(
                           int(user_id),
@@ -865,6 +877,15 @@ def background_price_monitor():
                           f"❌ **تم ضرب مستوى وقف الخسارة (SL) وحماية المحافظة.**",
                           parse_mode="Markdown",
                       )
+                    except Exception:
+                      pass
+                    
+                    # 2. الترحيل التلقائي لسجل الأداء العام ليظهر للمشتركين
+                    try:
+                      results_db = load_results()
+                      res_msg = f"❌ صفقة {symbol} ضرب وقف الخسارة (SL) عند سعر {current_val:,.2f}"
+                      results_db["daily"].append(res_msg)
+                      save_results(results_db)
                     except Exception:
                       pass
         if updated:
@@ -1094,7 +1115,7 @@ def send_accounts_guide(message):
   accounts_text = (
       "🌐 **دليل فتح الحسابات وإنشاء المحافظ (الخطوة الأولى للاحتراف):**\n\n"
       "🏛️ **1. منصات التداول المركزية (مثل Binance أو Bybit):**\n"
-      "• هي البورصة الكبرى التي ستشتري وتبيع من خلالها العملات الرقمية والذهب وتنفذ الصفقات.\n"
+      "• هي البورصة الكبرى التي ستشتري وتبيع من خلالها العملات الرقمية والذهب وتنفيذ الصفقات.\n"
       "• **طريقة التسجيل:** تحميل التطبيق الرسمي من المتجر، التسجيل عبر البريد الإلكتروني، وإنشاء كلمة مرور قوية.\n"
       "• **توثيق الهوية (KYC):** ضروري جداً لحماية حسابك وسحب أرباحك بأمان، ويتم عبر رفع صورة جواز السفر أو الهوية الشخصية.\n\n"
       "👛 **2. المحافظ اللامركزية (مثل Trust Wallet أو MetaMask):**\n"
