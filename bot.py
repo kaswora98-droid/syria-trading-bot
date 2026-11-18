@@ -45,7 +45,7 @@ def send_welcome(message):
     first_name = message.from_user.first_name or "User"
 
     if user_id not in users_data:
-        # منح فترة تجريبية افتراضية (مثلاً 3 أيام للمستخدمين الجدد)
+        # منح فترة تجريبية افتراضية (3 أيام للمستخدمين الجدد)
         expiry_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
         users_data[user_id] = {
             "username": username,
@@ -75,7 +75,6 @@ def admin_users_list(message):
 
     response = "📋 **قائمة المشتركين المسجلين:**\n\n"
     
-    # بناء رسالة مع أزرار انلاين مباشرة لكل مستخدم لفتح ملفه الشخصي عبر tg://user?id=
     markup = types.InlineKeyboardMarkup()
     
     for uid, info in current_users.items():
@@ -120,7 +119,7 @@ def add_user_days(message):
             save_users(current_users)
             bot.reply_to(message, f"تمت إضافة {days_to_add} أيام بنجاح للمستخدم `{target_id}`.", parse_mode="Markdown")
         except Exception as e:
-            bot.reply_to(message, f حدث خطأ أثناء تحديث تاريخ الاشتراك: {e}")
+            bot.reply_to(message, f"حدث خطأ أثناء تحديث تاريخ الاشتراك: {e}")
     else:
         bot.reply_to(message, "المستخدم غير مسجل في قاعدة البيانات.")
 
@@ -129,7 +128,6 @@ def background_price_monitor():
     """خيط خلفي لإدارة وتنبيهات الأسعار الخاصة بالمشتركين"""
     while True:
         try:
-            # هنا يمكنك وضع منطق فحص الأسعار وجلبها وجدولة التنبيهات
             pass
         except Exception as e:
             print(f"Monitor error: {e}")
