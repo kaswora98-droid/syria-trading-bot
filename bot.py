@@ -1061,8 +1061,12 @@ if __name__ == "__main__":
 
   try:
     bot.remove_webhook()
-    print("Webhook removed. Starting bot polling...")
+    print("Webhook removed successfully.")
+    time.sleep(2)
   except Exception as e:
     print(f"Error removing webhook: {e}")
 
-  bot.infinity_polling(timeout=60, long_polling_timeout=60)
+  print("Starting bot polling...")
+  bot.infinity_polling(
+      timeout=60, long_polling_timeout=60, skip_pending=True
+  )
