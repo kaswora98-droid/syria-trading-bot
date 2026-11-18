@@ -7,7 +7,7 @@ import telebot
 from telebot import types
 from flask import Flask
 
-# إعدادات التوكن الجديد وصلاحيات المشرف
+# إعدادات التوكن وصلاحيات المشرف
 TOKEN = os.getenv("BOT_TOKEN", "8928709566:AAHLnA5OTsu0Gxmn3S-GBNAzzd_pNewAAfQ")
 ADMIN_IDS = [8611033531]  # معرف المشرف الأساسي
 
@@ -185,7 +185,7 @@ if __name__ == "__main__":
   print("Starting bot polling...")
   try:
     bot.infinity_polling(
-        timeout=60, long_polling_timeout=60, skip_pending=True
+        timeout=120, long_polling_timeout=120, skip_pending=True
     )
   except Exception as e:
     print(f"Polling error: {e}")
