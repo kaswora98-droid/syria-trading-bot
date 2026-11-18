@@ -494,12 +494,16 @@ def send_golden_rule_deals(message):
   user_id = str(message.from_user.id)
   btc, eth, xrp = get_crypto_prices()
 
-  # تثبيت وتتبع الصفقات للمستخدم تلقائياً فور إرسالها
+  # تثبيت وتتبع الصفقات للمستخدم تلقائياً فور إرسالها مع تحديد الأهداف والوقف للمراقبة الآلية
   tracked = load_tracked_deals()
   tracked[user_id] = {
       "type": "golden_rule",
       "timestamp": datetime.now().isoformat(),
-      "entries": {"XRP": xrp, "BTC": btc, "ETH": eth}
+      "entries": {
+          "XRP": {"entry": xrp, "tp1": xrp * 1.008, "sl": xrp * (1 - 0.012), "status": "active"},
+          "BTC": {"entry": btc, "tp1": btc * 1.012, "sl": btc * (1 - 0.012), "status": "active"},
+          "ETH": {"entry": eth, "tp1": eth * 1.03, "sl": eth * (1 - 0.012), "status": "active"}
+      }
   }
   save_tracked_deals(tracked)
 
@@ -516,7 +520,7 @@ def send_golden_rule_deals(message):
 
   deals_text = (
       "📊 **صفقات القاعدة الذهبية للعملات (النسب الثابتة وإدارة المخاطر - بالسعر الحي):**\n\n"
-      "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً.*\n\n"
+      "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً في الخلفية.*\n\n"
       "⚡ **1. صفقات السكالبينج للعملات:**\n"
       f"• **العملة:** XRP/USDT (سعر الدخول: `{xrp:,.4f}`)\n"
       f"  🛑 *وقف الخسارة (SL):* `{xrp_sl:,.4f}` (-1.2%)\n"
@@ -576,13 +580,17 @@ def send_analytical_vision_deals(message):
   tracked[user_id] = {
       "type": "analytical",
       "timestamp": datetime.now().isoformat(),
-      "entries": {"BTC": btc_price, "ETH": eth_price, "XRP": xrp_price}
+      "entries": {
+          "BTC": {"entry": btc_price, "tp1": btc_price * (1 + btc_tp1_p), "sl": btc_price * (1 - btc_sl_p), "status": "active"},
+          "ETH": {"entry": eth_price, "tp1": eth_price * (1 + eth_tp1_p), "sl": eth_price * (1 - eth_sl_p), "status": "active"},
+          "XRP": {"entry": xrp_price, "tp1": xrp_price * (1 + xrp_tp1_p), "sl": xrp_price * (1 - xrp_sl_p), "status": "active"}
+      }
   }
   save_tracked_deals(tracked)
 
   deals_text = (
       "📊 **صفقات الرؤية التحليلية وقراءة الزخم الحي للعملات:**\n\n"
-      "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً.*\n\n"
+      "📌 *تم تثبيت هذه الأسعار كمرجع لمتابعة أهدافك تلقائياً في الخلفية.*\n\n"
       f"🪙 **1. بيتكوين (BTC/USDT):**\n"
       f"• السعر الحالي: `{btc_price:,.2f}$` (التغير 24س: `{btc_chg:+.2f}%`)\n"
       f"• الحالة: {btc_trend}\n"
@@ -600,7 +608,7 @@ def send_analytical_vision_deals(message):
       f"⚡ **3. ريبل (XRP/USDT):**\n"
       f"• السعر الحالي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
       f"• الحالة: {xrp_trend}\n"
-      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.2f}`\n"
+      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.4f}`\n"
       f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.2f}` (+{xrp_tp1_p*100}%)\n"
       f"  ⏱️ *الإغلاق للعملات:* ⚡ إغلاق لحظي فوري / 🕯️ إغلاق شمعة مؤكد.\n\n"
       "🛡️ **نظام التأمين:** يتم تفعيل Breakeven (نقل وقف الخسارة لسعر الدخول) فور بلوغ الهدف الأول تلقائياً."
@@ -620,7 +628,14 @@ def send_gold_golden_rule(message):
   tracked[user_id] = {
       "type": "gold_golden",
       "timestamp": datetime.now().isoformat(),
-      "entries": {"GOLD": current_gold}
+      "entries": {
+          "GOLD": {
+              "entry": current_gold,
+              "tp1": current_gold * (1 + 0.007),
+              "sl": current_gold * (1 - 0.01),
+              "status": "active"
+          }
+      }
   }
   save_tracked_deals(tracked)
 
@@ -630,7 +645,7 @@ def send_gold_golden_rule(message):
 
   gold_text = (
       "🟡 **توصيات صفقات الذهب (القاعدة الذهبية):**\n\n"
-      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً.*\n\n"
+      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً في الخلفية.*\n\n"
       f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
       f"🛑 **وقف الخسارة المقترح (SL):** `{sl_price:,.2f}` $ (-1.0%)\n\n"
       "⚡ **1️⃣ صفقات الذهب اليومية:**\n"
@@ -655,7 +670,14 @@ def send_gold_analytical_vision(message):
   tracked[user_id] = {
       "type": "gold_analytical",
       "timestamp": datetime.now().isoformat(),
-      "entries": {"GOLD": current_gold}
+      "entries": {
+          "GOLD": {
+              "entry": current_gold,
+              "tp1": current_gold * (1 + 0.01),
+              "sl": current_gold * (1 - 0.012),
+              "status": "active"
+          }
+      }
   }
   save_tracked_deals(tracked)
 
@@ -665,7 +687,7 @@ def send_gold_analytical_vision(message):
 
   gold_text = (
       "🟡 **توصيات صفقات الذهب (الرؤية التحليلية والزخم الحي):**\n\n"
-      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً.*\n\n"
+      "📌 *تم تثبيت هذا السعر كمرجع لتتبع الأهداف تلقائياً في الخلفية.*\n\n"
       f"📍 **سعر الدخول الحالي (Entry):** `{current_gold:,.2f}` $\n"
       f"🚀 **حالة السوق:** رصد سيولة شرائية وتذبذب إيجابي.\n"
       f"🛑 **وقف الخسارة (SL):** `{sl_price:,.2f}` $ (-1.2%)\n\n"
@@ -762,27 +784,25 @@ def set_custom_alert(message):
     bot.send_message(message.chat.id, "⚠️ خطأ في كتابة السعر.")
 
 
+# --- حلقة المراقبة الآلية المدمجة في الخلفية لتتبع الصفقات وإرسال النتائج تلقائياً ---
 def background_price_monitor():
   while True:
     try:
-      if custom_alerts:
-        btc_p, eth_p, xrp_p = get_crypto_prices()
-        gold_p = get_gold_price()
-        prices_map = {"BTC": btc_p, "ETH": eth_p, "XRP": xrp_p, "GOLD": gold_p}
+      # أولاً: فحص الأسعار الحية الحالية للعملات والذهب
+      btc_p, eth_p, xrp_p = get_crypto_prices()
+      gold_p = get_gold_price()
+      prices_map = {"BTC": btc_p, "ETH": eth_p, "XRP": xrp_p, "GOLD": gold_p}
 
+      # ثانياً: فحص التنبيهات المخصصة للمستخدمين
+      if custom_alerts:
         for user_id in list(custom_alerts.keys()):
           user_alerts_list = custom_alerts[user_id]
           remaining_alerts = []
-
           for alert in user_alerts_list:
             asset = alert["asset"]
             target = alert["price"]
             current_price = prices_map.get(asset, 0)
-
-            triggered = False
-            if current_price > 0:
-              triggered = current_price >= target
-
+            triggered = current_price >= target if current_price > 0 else False
             if triggered:
               try:
                 bot.send_message(
@@ -798,11 +818,59 @@ def background_price_monitor():
                 pass
             else:
               remaining_alerts.append(alert)
-
           if remaining_alerts:
             custom_alerts[user_id] = remaining_alerts
           else:
             del custom_alerts[user_id]
+
+      # ثالثاً: فحص الصفقات المثبتة للمستخدمين وإرسال النتيجة فور تحقق الأهداف أو وقف الخسارة
+      tracked_deals = load_tracked_deals()
+      if tracked_deals:
+        updated = False
+        for user_id, deal_info in list(tracked_deals.items()):
+          entries = deal_info.get("entries", {})
+          for symbol, data in list(entries.items()):
+            if data.get("status") == "active":
+              current_val = prices_map.get(symbol, 0)
+              if current_val > 0:
+                tp1 = data.get("tp1", 0)
+                sl = data.get("sl", 0)
+                
+                # فحص هل تحقق الهدف الأول (ربح)
+                if tp1 > 0 and current_val >= tp1:
+                  data["status"] = "tp1_hit"
+                  updated = True
+                  try:
+                    bot.send_message(
+                        int(user_id),
+                        f"🎯 **تحديث نتيجة صفقة مثبتة (إنجاز تلقائي)!**\n\n"
+                        f"🪙 الأصل/العملة: `{symbol}`\n"
+                        f"📈 السعر الحالي: `{current_val:,.2f}`\n"
+                        f"✅ **مبروك! تم تحقيق الهدف الأول (TP1) بنجاح.**\n"
+                        f"🛡️ *التوصية:* تفعيل التأمين (Breakeven) وجني الأرباح الجزئية.",
+                        parse_mode="Markdown",
+                    )
+                  except Exception:
+                    pass
+                
+                # فحص هل ضرب وقف الخسارة
+                elif sl > 0 and current_val <= sl:
+                  data["status"] = "sl_hit"
+                  updated = True
+                  try:
+                    bot.send_message(
+                        int(user_id),
+                        f"🛑 **تحديث نتيجة صفقة مثبتة (إغلاق وقائي)!**\n\n"
+                        f"🪙 الأصل/العملة: `{symbol}`\n"
+                        f"📉 السعر الحالي: `{current_val:,.2f}`\n"
+                        f"❌ **تم ضرب مستوى وقف الخسارة (SL) وحماية المحافظة.**",
+                        parse_mode="Markdown",
+                    )
+                  except Exception:
+                    pass
+        if updated:
+          save_tracked_deals(tracked_deals)
+
     except Exception as e:
       print(f"Error in background monitor: {e}")
     time.sleep(60)
@@ -1188,7 +1256,7 @@ if __name__ == "__main__":
 
   alert_thread = threading.Thread(target=background_price_monitor, daemon=True)
   alert_thread.start()
-  print("Background price monitor worker started...")
+  print("Background price and deals monitor worker started...")
 
   try:
     bot.remove_webhook()
