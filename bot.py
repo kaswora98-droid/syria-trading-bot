@@ -233,7 +233,7 @@ def check_subscription(bot_instance, message):
       return True
 
 
-# --- القائمة الرئيسية مع الأزرار المحدثة ---
+# --- القائمة الرئيسية مع الأزرار الكاملة ---
 def get_main_menu(user_id):
   markup = types.ReplyKeyboardMarkup(
       resize_keyboard=True, is_persistent=True, row_width=2
@@ -606,10 +606,59 @@ def set_custom_alert(message):
     custom_alerts[user_id].append({"asset": asset, "price": target_price})
     bot.send_message(
         message.chat.id,
-        f"✅ تم ضبط التنبيه للعملة `{asset}` عند سعر `{target_price:,.2f}`",
+        f"✅ تم ضبط التنبيه الحقيقي للعملة `{asset}` عند سعر `{target_price:,.2f}`",
     )
   except Exception:
     bot.send_message(message.chat.id, "⚠️ خطأ في كتابة السعر.")
+
+
+# --- محرك مراقبة التنبيهات الحقيقي في الخلفية (Background Worker) ---
+def background_price_monitor():
+  while True:
+    try:
+      if custom_alerts:
+        btc_p, eth_p, xrp_p = get_crypto_prices()
+        gold_p = get_gold_price()
+
+        prices_map = {"BTC": btc_p, "ETH": eth_p, "XRP": xrp_p, "GOLD": gold_p}
+
+        for user_id in list(custom_alerts.keys()):
+          user_alerts_list = custom_alerts[user_id]
+          remaining_alerts = []
+
+          for alert in user_alerts_list:
+            asset = alert["asset"]
+            target = alert["price"]
+            current_price = prices_map.get(asset, 0)
+
+            triggered = False
+            if current_price > 0:
+              triggered = current_price >= target
+
+            if triggered:
+              try:
+                bot.send_message(
+                    user_id,
+                    f"🚨 **تنبيه سعر حقيقي وصل لهدفه!**\n\n"
+                    f"🪙 العملة/الأصل: `{asset}`\n"
+                    f"🎯 السعر المستهدف: `{target:,.2f}`\n"
+                    f"📊 السعر الحالي في السوق: `{current_price:,.2f}`\n\n"
+                    f"⚡ حان الوقت لمراجعة الشارت واتخاذ القرار المناسب.",
+                    parse_mode="Markdown",
+                )
+              except Exception:
+                pass
+            else:
+              remaining_alerts.append(alert)
+
+          if remaining_alerts:
+            custom_alerts[user_id] = remaining_alerts
+          else:
+            del custom_alerts[user_id]
+    except Exception as e:
+      print(f"Error in background monitor: {e}")
+
+    time.sleep(60)
 
 
 @bot.message_handler(
@@ -1004,6 +1053,11 @@ if __name__ == "__main__":
   flask_thread = threading.Thread(target=run_flask, daemon=True)
   flask_thread.start()
   print("Flask web server started successfully...")
+
+  # تشغيل مراقب التنبيهات الحقيقي في الخلفية
+  alert_thread = threading.Thread(target=background_price_monitor, daemon=True)
+  alert_thread.start()
+  print("Background price monitor worker started...")
 
   try:
     bot.remove_webhook()
