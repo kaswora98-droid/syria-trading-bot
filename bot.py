@@ -5,15 +5,18 @@ import time
 import requests
 import telebot
 from telebot import types
-from flask import Flask
+from flask import Flask, request
 
-# إعدادات التوكن الجديد وصلاحيات المشرف
+# إعدادات التوكن وصلاحيات المشرف
 TOKEN = os.getenv("BOT_TOKEN", "8928709566:AAHLnA5OTsu0Gxmn3S-GBNAzzd_pNewAAfQ")
 ADMIN_IDS = [8611033531]  # معرف المشرف الأساسي
 
-# ضبط البوت مع مهلة اتصال ممتدة لتجاوز مشكلة الـ Timeout
-bot = telebot.TeleBot(TOKEN, threaded=True, num_threads=4)
+bot = telebot.TeleBot(TOKEN, threaded=True)
 app = Flask(__name__)
+
+# رابط منصة Render الخاص بك (ضع رابط خدمتك هنا ليعمل الويب هوك بشكل صحيح)
+# مثال: https://your-app-name.onrender.com
+WEBHOOK_URL = os.getenv("RENDER_EXTERNAL_URL", "")
 
 # مسارات ملفات التخزين المحلي
 USERS_FILE = "users_data.json"
@@ -68,15 +71,27 @@ def get_main_keyboard(user_id):
   return markup
 
 
-# مسارات الـ Flask الأساسية للبقاء حياً 24/7 عبر UptimeRobot
+# مسارات الـ Flask لاستقبال رسائل تليجرام والبقاء حياً 24/7
 @app.route("/")
 def home():
-  return "Bot is running live and active 24/7!"
+  return "Bot is running live with Webhook 24/7!"
 
 
 @app.route("/ping")
 def ping():
   return "PONG", 200
+
+
+# مسار استقبال التحديثات من تليجرام (Webhook Endpoint)
+@app.route(f"/{TOKEN}", methods=["POST"])
+def telegram_webhook():
+  if request.headers.get("content-type") == "application/json":
+    json_string = request.get_data().decode("utf-8")
+    update = telebot.types.Update.de_json(json_string)
+    bot.process_new_updates([update])
+    return "", 200
+  else:
+    return "Forbidden", 403
 
 
 # دوال جلب الأسعار الحية واللحظية
@@ -221,7 +236,7 @@ def handle_reply_buttons(message):
         f"⚙️ **لوحة تحكم المشرف الأساسي:**\n\n"
         f"👥 إجمالي المستخدمين المسجلين: `{total_users}`\n"
         f"📊 الصفقات النشطة حالياً: `{len(active_trades)}`\n"
-        f"🟢 حالة السيرفر: متصل ويعمل 24/7"
+        f"🟢 حالة السيرفر: متصل عبر Webhook ويعمل 24/7"
     )
     bot.send_message(
         message.chat.id,
@@ -231,32 +246,25 @@ def handle_reply_buttons(message):
     )
 
 
-# التشغيل الرئيسي والآمن للسيرفر والـ Polling
+# التشغيل الرئيسي عبر Webhook
 if __name__ == "__main__":
-
-  def run_flask():
+  # ضبط الويب هوك تلقائياً عند الإقلاع
+  if WEBHOOK_URL:
     try:
-      port = int(os.environ.get("PORT", 10000))
-      app.run(host="0.0.0.0", port=port, use_reloader=False)
+      bot.remove_webhook()
+      time.sleep(1)
+      bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+      print(f"Webhook set successfully to {WEBHOOK_URL}/{TOKEN}")
     except Exception as e:
-      print(f"Flask error: {e}")
+      print(f"Error setting webhook: {e}")
 
-  # تشغيل سيرفر الويب في خلفية منفصلة
-  flask_thread = threading.Thread(target=run_flask, daemon=True)
-  flask_thread.start()
-  print("Flask web server started successfully...")
-
-  # تشغيل عامل مراقبة الصفقات والأسعار
+  # تشغيل عامل مراقبة الصفقات والأسعار في الخلفية
   monitor_thread = threading.Thread(
       target=background_trade_and_price_monitor, daemon=True
   )
   monitor_thread.start()
   print("Background trade and price monitor worker started...")
 
-  print("Starting bot polling with extended timeout...")
-  try:
-    bot.infinity_polling(
-        timeout=120, long_polling_timeout=120, skip_pending=True
-    )
-  except Exception as e:
-    print(f"Polling error: {e}")
+  # تشغيل سيرفر الويب لاستقبال الطلبات
+  port = int(os.environ.get("PORT", 10000))
+  app.run(host="0.0.0.0", port=port)
