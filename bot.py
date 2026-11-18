@@ -470,8 +470,8 @@ def send_analytical_vision_deals(message):
       f"⚡ **3. ريبل (XRP/USDT):**\n"
       f"• السعر الحالي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
       f"• الحالة: {xrp_trend}\n"
-      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.4f}`\n"
-      f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.4f}` (+{xrp_tp1_p*100}%)\n\n"
+      f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.2f}`\n"
+      f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.2f}` (+{xrp_tp1_p*100}%)\n\n"
       "🛡️ **نظام التأمين:** يتم تفعيل Breakeven (نقل وقف الخسارة لسعر الدخول)"
       " فور بلوغ الهدف الأول تلقائياً."
   )
@@ -1025,17 +1025,45 @@ def admin_panel(message):
   )
 
 
+# --- أمر عرض المشتركين مع زر تفاعلي يفتح بروفايل المستخدم مباشرة ---
 @bot.message_handler(commands=["users"])
 def show_all_users(message):
   if message.from_user.id != ADMIN_ID:
     return
   if not all_users:
-    bot.send_message(message.chat.id, "📭 لا يوجد مشتركين.")
+    bot.send_message(message.chat.id, "📭 لا يوجد مشتركين في القاعدة حتى الآن.")
     return
-  text = f"👥 **إجمالي المشتركين:** {len(all_users)}\n\n"
+
+  bot.send_message(
+      message.chat.id,
+      f"👥 **قائمة المشتركين المسجلين (الإجمالي: {len(all_users)}):**",
+      parse_mode="Markdown",
+  )
+
   for uid, info in list(all_users.items())[-15:]:
-    text += f"• {info.get('name')} (`{uid}`) - ينتهي: {info.get('expiry')[:10]}\n"
-  bot.send_message(message.chat.id, text, parse_mode="Markdown")
+    user_name = info.get("name", "بدون اسم")
+    user_uname = info.get("username", "لا يوجد")
+    expiry_date = info.get("expiry", "")[:10]
+
+    text = (
+        f"👤 **الاسم:** {user_name}\n"
+        f"🆔 المعرف: `{uid}`\n"
+        f"🌐 اليوزر: `@{user_uname}`\n"
+        f"⏳ ينتهي في: `{expiry_date}`"
+    )
+
+    markup = types.InlineKeyboardMarkup()
+    profile_btn = types.InlineKeyboardButton(
+        text="💬 فتح الملف الشخصي", url=f"tg://user?id={uid}"
+    )
+    markup.add(profile_btn)
+
+    try:
+      bot.send_message(
+          message.chat.id, text, reply_markup=markup, parse_mode="Markdown"
+      )
+    except Exception:
+      pass
 
 
 @bot.message_handler(commands=["stats"])
