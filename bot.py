@@ -7,7 +7,7 @@ import time
 from datetime import datetime, timedelta
 
 # --- الإعدادات الأساسية ---
-TOKEN = "8928709566:AAE8G20dfLOqdo7GXJ9APGPqH7OTdyq5leg"
+TOKEN = "8928709566:AAHP9dZXrxkpp2FneolgC-Cfd4jFh6nqMF4"
 ADMIN_ID = 8611033531
 ADMIN_USERNAME = "@alone123987"
 
