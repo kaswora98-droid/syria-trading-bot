@@ -6,7 +6,7 @@ import threading
 import time
 from datetime import datetime, timedelta
 
-# --- الإعدادات الأساسية ---
+# --- الإعدادات الأساسية (التوكن الجديد) ---
 TOKEN = "8928709566:AAHP9dZXrxkpp2FneolgC-Cfd4jFh6nqMF4"
 ADMIN_ID = 8611033531
 ADMIN_USERNAME = "@alone123987"
@@ -37,6 +37,29 @@ def save_users(data):
 # تهيئة بيانات المستخدمين عند بدء التشغيل
 users_data = load_users()
 
+# --- لوحة المفاتيح الرئيسية الأصلية للبوت ---
+def get_main_keyboard(is_admin=False):
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(
+        types.KeyboardButton("📊 الصفقات"),
+        types.KeyboardButton("📰 موجز الأخبار الاقتصادية اللحظية")
+    )
+    markup.add(
+        types.KeyboardButton("🧠 اختبار تداولي تفاعلي (Quiz)"),
+        types.KeyboardButton("📚 الأكاديمية التعليمية للمبتدئين")
+    )
+    markup.add(
+        types.KeyboardButton("📖 قاموس مصطلحات التداول (بحث ذكي)"),
+        types.KeyboardButton("🌐 دليل السحب والإيداع (شبكة TRC20) وإستخراج المحافظ")
+    )
+    markup.add(
+        types.KeyboardButton("⏳ حالة اشتراكي ورابط دعوة (شام كاش)"),
+        types.KeyboardButton("💳 الدفع والشحن المحلي (شام كاش)")
+    )
+    if is_admin:
+        markup.add(types.KeyboardButton("🛠 لوحة تحكم المطور"))
+    return markup
+
 # --- معالجة أمر البداية /start ---
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -45,7 +68,6 @@ def send_welcome(message):
     first_name = message.from_user.first_name or "User"
 
     if user_id not in users_data:
-        # منح فترة تجريبية افتراضية (3 أيام للمستخدمين الجدد)
         expiry_date = (datetime.now() + timedelta(days=3)).strftime("%Y-%m-%d %H:%M:%S")
         users_data[user_id] = {
             "username": username,
@@ -55,13 +77,39 @@ def send_welcome(message):
         }
         save_users(users_data)
 
-    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
-    markup.add(types.KeyboardButton("📊 الصفقات"), types.KeyboardButton("🎓 الأكاديمية"))
-    markup.add(types.KeyboardButton("🧮 الحاسبة"), types.KeyboardButton("👤 حسابي"))
+    is_admin = (message.from_user.id == ADMIN_ID)
+    markup = get_main_keyboard(is_admin)
 
     bot.reply_to(message, f"أهلاً بك يا {first_name} في بوت التداول والأكاديمية الخاص بك.", reply_markup=markup)
 
-# --- أمر لوحة التحكم /users مع أزرار الملف الشخصي التفاعلية ---
+# --- لوحة تحكم المطور (الزر النصي) ---
+@bot.message_handler(func=lambda message: message.text == "🛠 لوحة تحكم المطور")
+def admin_panel_text(message):
+    if message.from_user.id != ADMIN_ID:
+        return
+    text = (
+        "👑 **لوحة تحكم المطور:**\n"
+        "الأوامر المتاحة:\n"
+        "• `/users` - لعرض قائمة المشتركين\n"
+        "• `/stats` - لعرض الإحصائيات\n"
+        "• `/add_days ID days` - لإضافة أيام للمشترك\n"
+        "• `/ban ID` - لحظر مستخدم"
+    )
+    bot.reply_to(message, text, parse_mode="Markdown")
+
+# --- أمر الإحصائيات /stats ---
+@bot.message_handler(commands=['stats'])
+def admin_stats(message):
+    if message.from_user.id != ADMIN_ID:
+        bot.reply_to(message, "عذراً، هذا الأمر مخصص للمشرف فقط.")
+        return
+    
+    current_users = load_users()
+    total_users = len(current_users)
+    text = f"📊 **إجمالي المشتركين:** {total_users}\n مجموعات مفعلة: 0"
+    bot.reply_to(message, text, parse_mode="Markdown")
+
+# --- أمر لوحة التحكم /users الأصلية مع أزرار الملف الشخصي ---
 @bot.message_handler(commands=['users'])
 def admin_users_list(message):
     if message.from_user.id != ADMIN_ID:
@@ -70,20 +118,19 @@ def admin_users_list(message):
 
     current_users = load_users()
     if not current_users:
-        bot.reply_to(message, "لا يوجد أي مستخدمين مسجلين حتى الآن.")
+        bot.reply_to(message, "📭 لا يوجد مشتركين في القاعدة حتى الآن.")
         return
 
-    response = "📋 **قائمة المشتركين المسجلين:**\n\n"
-    
+    response = f"👥 **قائمة المشتركين المسجلين (الإجمالي: {len(current_users)}):**\n\n"
     markup = types.InlineKeyboardMarkup()
     
     for uid, info in current_users.items():
         fname = info.get('first_name', 'مستخدم')
         uname = info.get('username', 'بدون معرف')
-        response += f"👤 {fname} (@{uname}) | ID: `{uid}`\n"
+        expiry = info.get('expiry_date', 'غير متوفر')
         
-        # زر تفاعلي يفتح الملف الشخصي للمستخدم مباشرة
-        markup.add(types.InlineKeyboardButton(f"🔗 ملف: {fname}", url=f"tg://user?id={uid}"))
+        response += f"👤 الاسم: {fname}\n🆔 المعرف: `{uid}`\n🌐 اليوزر: @{uname}\n⏳ ينتهي في: {expiry}\n------------------\n"
+        markup.add(types.InlineKeyboardButton(f"🔗 فتح الملف الشخصي", url=f"tg://user?id={uid}"))
 
     if len(response) > 4000:
         response = response[:4000] + "\n...(تم اختصار القائمة لطولها)"
