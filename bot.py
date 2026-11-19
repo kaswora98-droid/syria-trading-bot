@@ -799,19 +799,25 @@ def send_golden_rule_deals(message):
           "XRP": {
               "entry": xrp,
               "tp1": xrp * 1.008,
+              "tp2": xrp * 1.015,
               "sl": xrp * (1 - 0.012),
+              "stage": "tp1",
               "status": "active",
           },
           "BTC": {
               "entry": btc,
               "tp1": btc * 1.012,
+              "tp2": btc * 1.025,
               "sl": btc * (1 - 0.012),
+              "stage": "tp1",
               "status": "active",
           },
           "ETH": {
               "entry": eth,
               "tp1": eth * 1.03,
+              "tp2": eth * 1.06,
               "sl": eth * (1 - 0.012),
+              "stage": "tp1",
               "status": "active",
           },
       },
@@ -908,19 +914,25 @@ def send_analytical_vision_deals(message):
           "BTC": {
               "entry": btc_price,
               "tp1": btc_price * (1 + btc_tp1_p),
+              "tp2": btc_price * (1 + btc_tp2_p),
               "sl": btc_price * (1 - btc_sl_p),
+              "stage": "tp1",
               "status": "active",
           },
           "ETH": {
               "entry": eth_price,
               "tp1": eth_price * (1 + eth_tp1_p),
+              "tp2": eth_price * (1 + eth_tp2_p),
               "sl": eth_price * (1 - eth_sl_p),
+              "stage": "tp1",
               "status": "active",
           },
           "XRP": {
               "entry": xrp_price,
               "tp1": xrp_price * (1 + xrp_tp1_p),
+              "tp2": xrp_price * (1 + xrp_tp2_p),
               "sl": xrp_price * (1 - xrp_sl_p),
+              "stage": "tp1",
               "status": "active",
           },
       },
@@ -935,17 +947,20 @@ def send_analytical_vision_deals(message):
       f"• السعر الحي: `{btc_price:,.2f}$` (التغير 24س: `{btc_chg:+.2f}%`)\n"
       f"• الحالة: {btc_trend}\n"
       f"  🛑 *SL:* `{btc_price * (1 - btc_sl_p):,.2f}`\n"
-      f"  🎯 *TP1:* `{btc_price * (1 + btc_tp1_p):,.2f}` (+{btc_tp1_p*100}%)\n\n"
+      f"  🎯 *TP1:* `{btc_price * (1 + btc_tp1_p):,.2f}` (+{btc_tp1_p*100}%)\n"
+      f"  🚀 *TP2:* `{btc_price * (1 + btc_tp2_p):,.2f}` (+{btc_tp2_p*100}%)\n\n"
       f"💎 **2. إيثريوم (ETH/USDT):**\n"
       f"• السعر الحي: `{eth_price:,.2f}$` (التغير 24س: `{eth_chg:+.2f}%`)\n"
       f"• الحالة: {eth_trend}\n"
       f"  🛑 *SL:* `{eth_price * (1 - eth_sl_p):,.2f}`\n"
-      f"  🎯 *TP1:* `{eth_price * (1 + eth_tp1_p):,.2f}` (+{eth_tp1_p*100}%)\n\n"
+      f"  🎯 *TP1:* `{eth_price * (1 + eth_tp1_p):,.2f}` (+{eth_tp1_p*100}%)\n"
+      f"  🚀 *TP2:* `{eth_price * (1 + eth_tp2_p):,.2f}` (+{eth_tp2_p*100}%)\n\n"
       f"⚡ **3. ريبل (XRP/USDT):**\n"
       f"• السعر الحي: `{xrp_price:,.4f}$` (التغير 24س: `{xrp_chg:+.2f}%`)\n"
       f"• الحالة: {xrp_trend}\n"
       f"  🛑 *SL:* `{xrp_price * (1 - xrp_sl_p):,.4f}`\n"
       f"  🎯 *TP1:* `{xrp_price * (1 + xrp_tp1_p):,.4f}` (+{xrp_tp1_p*100}%)\n"
+      f"  🚀 *TP2:* `{xrp_price * (1 + xrp_tp2_p):,.4f}` (+{xrp_tp2_p*100}%)\n"
   )
   send_with_menu(message, deals_text)
 
@@ -976,7 +991,9 @@ def send_gold_golden_rule(message):
           "GOLD": {
               "entry": current_gold,
               "tp1": current_gold * (1 + 0.007),
+              "tp2": current_gold * (1 + 0.014),
               "sl": current_gold * (1 - 0.01),
+              "stage": "tp1",
               "status": "active",
           }
       },
@@ -984,6 +1001,7 @@ def send_gold_golden_rule(message):
   save_tracked_deals(tracked)
 
   tp1_price = current_gold * (1 + 0.007)
+  tp2_price = current_gold * (1 + 0.014)
   sl_price = current_gold * (1 - 0.01)
 
   gold_text = (
@@ -993,6 +1011,7 @@ def send_gold_golden_rule(message):
       f"📍 **سعر الدخول الحي (Entry):** `{current_gold:,.2f}` $\n"
       f"🛑 **وقف الخسارة المقترح (SL):** `{sl_price:,.2f}` $ (-1.0%)\n\n"
       f"• **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ ──> **(+0.7%)**\n"
+      f"• **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ ──> **(+1.4%)**\n"
   )
   send_with_menu(message, gold_text)
 
@@ -1023,7 +1042,9 @@ def send_gold_analytical_vision(message):
           "GOLD": {
               "entry": current_gold,
               "tp1": current_gold * (1 + 0.01),
+              "tp2": current_gold * (1 + 0.02),
               "sl": current_gold * (1 - 0.012),
+              "stage": "tp1",
               "status": "active",
           }
       },
@@ -1031,6 +1052,7 @@ def send_gold_analytical_vision(message):
   save_tracked_deals(tracked)
 
   tp1_price = current_gold * (1 + 0.01)
+  tp2_price = current_gold * (1 + 0.02)
   sl_price = current_gold * (1 - 0.012)
 
   gold_text = (
@@ -1040,6 +1062,7 @@ def send_gold_analytical_vision(message):
       f"📍 **سعر الدخول الحي (Entry):** `{current_gold:,.2f}` $\n"
       f"🛑 **وقف الخسارة (SL):** `{sl_price:,.2f}` $ (-1.2%)\n\n"
       f"• **الهدف الأول (TP1):** `{tp1_price:,.2f}` $ ──> **(+1.0%)**\n"
+      f"• **الهدف الثاني (TP2):** `{tp2_price:,.2f}` $ ──> **(+2.0%)**\n"
   )
   send_with_menu(message, gold_text)
 
@@ -1155,7 +1178,9 @@ def background_price_monitor():
       if (now_dt - last_weekly).total_seconds() >= 7 * 24 * 3600:
         daily_items = results_db.get("daily", [])
         success_count = sum(
-            1 for item in daily_items if "TP1" in item or "ربح" in item
+            1
+            for item in daily_items
+            if "TP1" in item or "TP2" in item or "ربح" in item
         )
         total_count = len(daily_items)
         weekly_summary = (
@@ -1173,7 +1198,9 @@ def background_price_monitor():
       if (now_dt - last_monthly).total_seconds() >= 30 * 24 * 3600:
         daily_items = results_db.get("daily", [])
         success_count = sum(
-            1 for item in daily_items if "TP1" in item or "ربح" in item
+            1
+            for item in daily_items
+            if "TP1" in item or "TP2" in item or "ربح" in item
         )
         total_count = len(daily_items)
         monthly_summary = (
@@ -1226,7 +1253,7 @@ def background_price_monitor():
           else:
             del custom_alerts[user_id]
 
-      # فحص جميع الصفقات المثبتة بالتوازي
+      # فحص جميع الصفقات المثبتة بالتوازي (متابعة TP1 ثم تحويله تلقائياً لصفقة ثانية نحو TP2 مع تعديل الخسارة)
       tracked_deals = load_tracked_deals()
       if tracked_deals:
         updated = False
@@ -1237,62 +1264,148 @@ def background_price_monitor():
               if data.get("status") == "active":
                 current_val = prices_map.get(symbol, 0)
                 if current_val > 0:
+                  stage = data.get("stage", "tp1")
+                  entry_price = data.get("entry", current_val)
                   tp1 = data.get("tp1", 0)
+                  tp2 = data.get("tp2", 0)
                   sl = data.get("sl", 0)
 
-                  if tp1 > 0 and current_val >= tp1:
-                    data["status"] = "tp1_hit"
-                    updated = True
+                  if stage == "tp1":
+                    if tp1 > 0 and current_val >= tp1:
+                      updated = True
 
-                    try:
-                      bot.send_message(
-                          int(user_id),
-                          "🎯 **تحديث نتيجة صفقة مثبتة (إنجاز تلقائي)!**\n\n"
-                          f"🪙 الأصل/العملة: `{symbol}`\n"
-                          f"📈 السعر الحي: `{current_val:,.2f}`\n"
-                          "✅ **مبروك! تم تحقيق الهدف الأول (TP1) بنجاح.**",
-                          parse_mode="Markdown",
-                      )
-                    except Exception:
-                      pass
+                      try:
+                        r_db = load_results()
+                        res_msg = (
+                            f"✅ صفقة {symbol} تحقيق الهدف الأول (TP1) بنجاح"
+                            f" عند السعر الحي {current_val:,.4f}"
+                        )
+                        r_db["daily"].append(res_msg)
+                        save_results(r_db)
+                      except Exception:
+                        pass
 
-                    try:
-                      r_db = load_results()
-                      res_msg = (
-                          f"✅ صفقة {symbol} تحقيق الهدف (TP1) بنجاح عند السعر"
-                          f" الحي {current_val:,.2f}"
-                      )
-                      r_db["daily"].append(res_msg)
-                      save_results(r_db)
-                    except Exception:
-                      pass
+                      if tp2 > 0:
+                        new_sl = entry_price
+                        data["sl"] = new_sl
+                        data["stage"] = "tp2"
+                        data["status"] = "active"
+                        try:
+                          bot.send_message(
+                              int(user_id),
+                              "🎯 **تم تحقيق الهدف الأول (TP1) وإغلاق الصفقة"
+                              " الأولى!**\n\n"
+                              f"🪙 الأصل/العملة: `{symbol}`\n"
+                              f"📈 السعر الحي: `{current_val:,.4f}`\n"
+                              "🔄 **تم تلقائياً تفعيل صفقة ثانية نحو الهدف"
+                              f" الثاني (TP2): `{tp2:,.4f}`**\n"
+                              "🛑 **تم تحديث وقف الخسارة (SL) الجديد إلى نقطة"
+                              f" الدخول: `{new_sl:,.4f}`**",
+                              parse_mode="Markdown",
+                          )
+                        except Exception:
+                          pass
+                      else:
+                        data["status"] = "tp1_hit"
+                        try:
+                          bot.send_message(
+                              int(user_id),
+                              "🎯 **تحديث نتيجة صفقة مثبتة (إنجاز"
+                              " تلقائي)!**\n\n"
+                              f"🪙 الأصل/العملة: `{symbol}`\n"
+                              f"📈 السعر الحي: `{current_val:,.4f}`\n"
+                              "✅ **مبروك! تم تحقيق الهدف الأول (TP1)"
+                              " بنجاح.**",
+                              parse_mode="Markdown",
+                          )
+                        except Exception:
+                          pass
 
-                  elif sl > 0 and current_val <= sl:
-                    data["status"] = "sl_hit"
-                    updated = True
+                    elif sl > 0 and current_val <= sl:
+                      data["status"] = "sl_hit"
+                      updated = True
 
-                    try:
-                      bot.send_message(
-                          int(user_id),
-                          "🛑 **تحديث نتيجة صفقة مثبتة (إغلاق وقائي)!**\n\n"
-                          f"🪙 الأصل/العملة: `{symbol}`\n"
-                          f"📉 السعر الحي: `{current_val:,.2f}`\n"
-                          "❌ **تم ضرب مستوى وقف الخسارة (SL).**",
-                          parse_mode="Markdown",
-                      )
-                    except Exception:
-                      pass
+                      try:
+                        bot.send_message(
+                            int(user_id),
+                            "🛑 **تحديث نتيجة صفقة مثبتة (إغلاق وقائي)!**\n\n"
+                            f"🪙 الأصل/العملة: `{symbol}`\n"
+                            f"📉 السعر الحي: `{current_val:,.4f}`\n"
+                            "❌ **تم ضرب مستوى وقف الخسارة (SL).**",
+                            parse_mode="Markdown",
+                        )
+                      except Exception:
+                        pass
 
-                    try:
-                      r_db = load_results()
-                      res_msg = (
-                          f"❌ صفقة {symbol} ضرب وقف الخسارة (SL) عند السعر الحي"
-                          f" {current_val:,.2f}"
-                      )
-                      r_db["daily"].append(res_msg)
-                      save_results(r_db)
-                    except Exception:
-                      pass
+                      try:
+                        r_db = load_results()
+                        res_msg = (
+                            f"❌ صفقة {symbol} ضرب وقف الخسارة (SL) عند السعر"
+                            f" الحي {current_val:,.4f}"
+                        )
+                        r_db["daily"].append(res_msg)
+                        save_results(r_db)
+                      except Exception:
+                        pass
+
+                  elif stage == "tp2":
+                    if tp2 > 0 and current_val >= tp2:
+                      data["status"] = "tp2_hit"
+                      updated = True
+
+                      try:
+                        bot.send_message(
+                            int(user_id),
+                            "🚀 **تم تحقيق الهدف الثاني (TP2) للصفقة"
+                            " الثانية!**\n\n"
+                            f"🪙 الأصل/العملة: `{symbol}`\n"
+                            f"📈 السعر الحي: `{current_val:,.4f}`\n"
+                            "✅ **مبروك! تم إغلاق الصفقة الثانية بنجاح عند"
+                            " TP2.**",
+                            parse_mode="Markdown",
+                        )
+                      except Exception:
+                        pass
+
+                      try:
+                        r_db = load_results()
+                        res_msg = (
+                            f"🚀 الصفقة الثانية {symbol} تحقيق الهدف الثاني"
+                            f" (TP2) بنجاح عند السعر الحي {current_val:,.4f}"
+                        )
+                        r_db["daily"].append(res_msg)
+                        save_results(r_db)
+                      except Exception:
+                        pass
+
+                    elif sl > 0 and current_val <= sl:
+                      data["status"] = "tp2_sl_hit"
+                      updated = True
+
+                      try:
+                        bot.send_message(
+                            int(user_id),
+                            "🛡️ **إغلاق الصفقة الثانية على وقف الخسارة المعدّل"
+                            " (SL)!**\n\n"
+                            f"🪙 الأصل/العملة: `{symbol}`\n"
+                            f"📉 السعر الحي: `{current_val:,.4f}`\n"
+                            "⚠️ **تم إغلاق الصفقة الثانية عند مستوى وقف"
+                            f" الخسارة الجديد (`{sl:,.4f}`).**",
+                            parse_mode="Markdown",
+                        )
+                      except Exception:
+                        pass
+
+                      try:
+                        r_db = load_results()
+                        res_msg = (
+                            f"🛡️ الصفقة الثانية {symbol} إغلاق على وقف الخسارة"
+                            f" المعدّل (SL) عند السعر الحي {current_val:,.4f}"
+                        )
+                        r_db["daily"].append(res_msg)
+                        save_results(r_db)
+                      except Exception:
+                        pass
         if updated:
           save_tracked_deals(tracked_deals)
 
