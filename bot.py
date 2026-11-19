@@ -235,6 +235,34 @@ def ensure_admin_entry(user):
       save_users(all_users)
 
 
+def is_subscription_active(uid_str):
+  if int(uid_str) == ADMIN_ID:
+    return True
+  u = all_users.get(uid_str)
+  if not u:
+    return False
+  exp_str = u.get("expiry")
+  if not exp_str:
+    return False
+  try:
+    expiry_dt = datetime.fromisoformat(exp_str)
+    return expiry_dt > datetime.now()
+  except Exception:
+    return False
+
+
+def send_subscription_expired_notice(chat_id):
+  bot.send_message(
+      chat_id,
+      "⛔ **انتهت صلاحية اشتراكك وتم إيقاف استخدام البوت تلقائياً.**\n\n"
+      "• يعود حسابك للعمل تلقائياً عند تمديد الاشتراك بواسطة المطور"
+      f" (`{ADMIN_USERNAME}`) أو عند إتمام دعوة 3 أشخاص عبر رابط الإحالة"
+      " للحصول على يوم مجاني.\n"
+      "• أرسل `/start` للاطلاع على حالة اشتراكك ورابط الدعوة.",
+      parse_mode="Markdown",
+  )
+
+
 def can_use_bot(message):
   user = message.from_user
   if not user:
@@ -246,6 +274,9 @@ def can_use_bot(message):
     return True
   if not has_username(user):
     send_no_username_notice(message.chat.id)
+    return False
+  if not is_subscription_active(str(user.id)):
+    send_subscription_expired_notice(message.chat.id)
     return False
   return True
 
@@ -608,19 +639,25 @@ def send_welcome(message):
         all_users[referrer_id]["referral_count"] = (
             all_users[referrer_id].get("referral_count", 0) + 1
         )
-        ref_current_exp = datetime.fromisoformat(
-            all_users[referrer_id]["expiry"]
-        )
-        ref_new_exp = max(ref_current_exp, datetime.now()) + timedelta(days=2)
-        all_users[referrer_id]["expiry"] = ref_new_exp.isoformat()
-        try:
-          bot.send_message(
-              int(referrer_id),
-              "🎉 انضم مستخدم جديد عبر رابطك! تمت إضافة يومين رصيد لاشتراكك.",
-              parse_mode="Markdown",
+        new_ref_count = all_users[referrer_id]["referral_count"]
+        if new_ref_count % 3 == 0:
+          ref_current_exp = datetime.fromisoformat(
+              all_users[referrer_id]["expiry"]
           )
-        except Exception:
-          pass
+          ref_new_exp = max(ref_current_exp, datetime.now()) + timedelta(days=1)
+          all_users[referrer_id]["expiry"] = ref_new_exp.isoformat()
+          if referrer_id in trial_history:
+            trial_history[referrer_id]["expiry"] = ref_new_exp.isoformat()
+            save_trial_history(trial_history)
+          try:
+            bot.send_message(
+                int(referrer_id),
+                "🎉 أتممت 3 دعوات ناجحة عبر رابطك! تمت إضافة يوم مجاني إلى"
+                " اشتراكك وعاد حسابك للعمل تلقائياً.",
+                parse_mode="Markdown",
+            )
+          except Exception:
+            pass
       save_users(all_users)
 
       try:
@@ -681,9 +718,10 @@ def send_welcome(message):
         save_users(all_users)
       welcome_text = (
           f"أهلاً بك مجدداً يا **{user_name}**.\n\n"
-          "⚠️ انتهت الفترة التجريبية/الاشتراك الخاص بحسابك ولن يتم تجديدها"
-          " تلقائياً.\n"
-          f"📩 للتواصل والتجديد: `{ADMIN_USERNAME}`"
+          "⚠️ انتهت الفترة التجريبية/الاشتراك الخاص بحسابك وتم إيقاف"
+          " استخدام البوت تلقائياً لحين التمديد أو إتمام دعوة 3 أشخاص"
+          " للحصول على يوم مجاني.\n"
+          f"📩 للتواصل والتمديد: `{ADMIN_USERNAME}`"
       )
 
   bot.send_message(
@@ -1730,8 +1768,8 @@ def check_my_status_and_ref(message):
       f"{status_line}\n"
       f"📅 **تاريخ الانتهاء:** `{expiry_dt.strftime('%Y-%m-%d %H:%M')}`\n"
       f"👥 **عدد دعوات الأصدقاء:** **{ref_count}**\n"
-      "🎁 **مكافأة الدعوة:** إضافة يومين إلى رصيد اشتراكك عند انضمام صديق"
-      " جديد وتفعيل تجربته لأول مرة عبر رابطك.\n"
+      "🎁 **مكافأة الدعوة:** إضافة يوم مجاني إلى رصيد اشتراكك عن كل 3"
+      " أشخاص ينضمون عبر رابطك.\n"
       f"🔗 **رابط الدعوة الخاص بك:**\n`{ref_link}`",
   )
 
@@ -1744,10 +1782,11 @@ def admin_panel(message):
   send_with_menu(
       message,
       "👑 **لوحة تحكم المطور:**\n\n"
-      "تتيح لك هذه اللوحة متابعة المشتركين والإحصائيات وتوثيق نتائج الصفقات"
-      " في السجل العام:\n"
-      "• `/users` — عرض إجمالي المشتركين المسجلين في النظام.\n"
+      "تتيح لك هذه اللوحة متابعة المشتركين والإحصائيات وتمديد الاشتراكات"
+      " وتوثيق نتائج الصفقات في السجل العام:\n"
+      "• `/users` — عرض إجمالي المشتركين وتفاصيل حساباتهم.\n"
       "• `/stats` — عرض إحصائيات المشتركين الحالية.\n"
+      "• `/extend [ID] [الأيام]` — تمديد اشتراك مستخدم بعدد أيام محدد.\n"
       "• `/add_result daily [النص]` — إضافة نتيجة جديدة إلى قسم النتائج"
       " اليومية.\n"
       "• `/add_result weekly [النص]` — إضافة حصيلة أو نتيجة إلى قسم النتائج"
@@ -1765,9 +1804,91 @@ def show_all_users(message):
   if not current_users:
     bot.send_message(message.chat.id, "📭 لا يوجد مشتركين.")
     return
+  lines = [f"👥 **إجمالي المشتركين: {len(current_users)}**\n"]
+  for uid, udata in current_users.items():
+    uname = (udata.get("username") or "").lstrip("@").strip()
+    uname_display = f"@{uname}" if uname else "لا يوجد يوزر"
+    name_display = udata.get("name") or "مستخدم"
+    exp_raw = udata.get("expiry", "")
+    try:
+      exp_display = datetime.fromisoformat(exp_raw).strftime("%Y-%m-%d %H:%M")
+    except Exception:
+      exp_display = exp_raw or "غير محدد"
+    lines.append(
+        f"• **{name_display}** | ID: `{uid}` | اليوزر: `{uname_display}` |"
+        f" الانتهاء: `{exp_display}`"
+    )
+  bot.send_message(message.chat.id, "\n".join(lines), parse_mode="Markdown")
+
+
+@bot.message_handler(commands=["extend"])
+def extend_user_subscription(message):
+  if message.from_user.id != ADMIN_ID:
+    return
+  parts = message.text.split()
+  if len(parts) < 3:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ الصيغة الصحيحة للأمر:\n`/extend [ID] [الأيام]`\n*مثال:* `/extend"
+        " 123456789 7`",
+        parse_mode="Markdown",
+    )
+    return
+  target_uid = parts[1].strip()
+  try:
+    days_to_add = int(parts[2].strip())
+  except Exception:
+    bot.send_message(
+        message.chat.id,
+        "⚠️ يرجى إدخال عدد صحيح للأيام (مثال: `7`).",
+        parse_mode="Markdown",
+    )
+    return
+
+  current_users = load_users()
+  if target_uid not in current_users:
+    bot.send_message(
+        message.chat.id,
+        f"❌ لم يتم العثور على مستخدم بالمعرّف `{target_uid}`.",
+        parse_mode="Markdown",
+    )
+    return
+
+  now_dt = datetime.now()
+  prev_exp_str = current_users[target_uid].get("expiry")
+  try:
+    prev_exp = datetime.fromisoformat(prev_exp_str) if prev_exp_str else now_dt
+  except Exception:
+    prev_exp = now_dt
+
+  base_dt = max(prev_exp, now_dt)
+  new_exp = base_dt + timedelta(days=days_to_add)
+
+  current_users[target_uid]["expiry"] = new_exp.isoformat()
+  if int(target_uid) != ADMIN_ID:
+    current_users[target_uid]["is_trial"] = False
+  current_users[target_uid]["trial_used"] = True
+  save_users(current_users)
+  all_users.clear()
+  all_users.update(current_users)
+
+  current_trials = load_trial_history()
+  if target_uid in current_trials:
+    current_trials[target_uid]["expiry"] = new_exp.isoformat()
+    save_trial_history(current_trials)
+    trial_history.clear()
+    trial_history.update(current_trials)
+
+  uname = (current_users[target_uid].get("username") or "").lstrip("@").strip()
+  uname_display = f"@{uname}" if uname else "لا يوجد يوزر"
   bot.send_message(
       message.chat.id,
-      f"👥 **إجمالي المشتركين: {len(current_users)}**",
+      "✅ **تم تمديد الاشتراك بنجاح وعاد الحساب للعمل تلقائياً!**\n\n"
+      f"👤 الاسم: {current_users[target_uid].get('name', 'مستخدم')}\n"
+      f"🆔 المعرّف: `{target_uid}`\n"
+      f"🌐 اليوزر: `{uname_display}`\n"
+      f"➕ المدة المضافة: `{days_to_add}` يوم\n"
+      f"📅 تاريخ الانتهاء الجديد: `{new_exp.strftime('%Y-%m-%d %H:%M')}`",
       parse_mode="Markdown",
   )
 
@@ -1783,12 +1904,17 @@ def show_stats(message):
   )
 
 
-# حارس عام لأي رسالة نصية أخرى لمنع من لا يملك يوزر تلقائياً
+# حارس عام لأي رسالة نصية أخرى لمنع من لا يملك يوزر أو انتهى اشتراكه تلقائياً
 @bot.message_handler(func=lambda message: True, content_types=["text"])
 def guard_other_text(message):
   if message.chat.type == "private" and message.from_user:
-    if message.from_user.id != ADMIN_ID and not has_username(message.from_user):
+    if message.from_user.id == ADMIN_ID:
+      return
+    if not has_username(message.from_user):
       send_no_username_notice(message.chat.id)
+      return
+    if not is_subscription_active(str(message.from_user.id)):
+      send_subscription_expired_notice(message.chat.id)
 
 
 if __name__ == "__main__":
