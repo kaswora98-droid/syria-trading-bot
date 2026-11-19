@@ -352,9 +352,10 @@ def get_crypto_prices():
   return btc, eth, xrp
 
 
-# جلب سعر الذهب الحي (XAUUSD) فقط دون إرجاع رقم ثابت عند الفشل
+# جلب سعر الذهب الحي (XAUUSD) من مصادر حية متعددة فقط دون إرجاع رقم ثابت عند الفشل
 def get_gold_price():
   headers = {"User-Agent": "Mozilla/5.0"}
+
   try:
     response = requests.get(
         "https://data-asg.goldprice.org/dbXRates/USD",
@@ -370,6 +371,44 @@ def get_gold_price():
             return float(val)
   except Exception:
     pass
+
+  try:
+    response = requests.get(
+        "https://api.gold-api.com/price/XAU",
+        headers=headers,
+        timeout=6,
+    )
+    if response.status_code == 200:
+      data = response.json()
+      val = data.get("price")
+      if val is not None and float(val) > 0:
+        return float(val)
+  except Exception:
+    pass
+
+  try:
+    response = requests.get(
+        "https://api.metals.live/v1/spot/gold",
+        headers=headers,
+        timeout=6,
+    )
+    if response.status_code == 200:
+      data = response.json()
+      if isinstance(data, list) and data:
+        first_item = data[0]
+        if isinstance(first_item, dict):
+          val = first_item.get("price") or first_item.get("gold")
+          if val is not None and float(val) > 0:
+            return float(val)
+        elif isinstance(first_item, (int, float)) and float(first_item) > 0:
+          return float(first_item)
+      elif isinstance(data, dict):
+        val = data.get("price") or data.get("gold")
+        if val is not None and float(val) > 0:
+          return float(val)
+  except Exception:
+    pass
+
   return None
 
 
