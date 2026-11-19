@@ -32,6 +32,7 @@ DATA_FILE = "users_data.json"
 GROUPS_FILE = "groups_data.json"
 RESULTS_FILE = "trading_results.json"  # ملف تخزين نتائج الصفقات وحصائل الأداء
 ACTIVE_DEALS_FILE = "active_tracked_deals.json"  # تخزين الصفقات المثبتة للمتداولين
+TRIAL_HISTORY_FILE = "trial_history.json"  # سجل دائم لمن استخدم الفترة التجريبية
 banned_users = set()
 
 risk_calculator_sessions = {}
@@ -77,6 +78,27 @@ def save_users(data):
       json.dump(data, f, ensure_ascii=False, indent=4)
   except Exception as e:
     print(f"Error saving users: {e}")
+
+
+def load_trial_history():
+  if os.path.exists(TRIAL_HISTORY_FILE):
+    try:
+      with open(TRIAL_HISTORY_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+        if not content.strip():
+          return {}
+        return json.loads(content)
+    except Exception:
+      return {}
+  return {}
+
+
+def save_trial_history(data):
+  try:
+    with open(TRIAL_HISTORY_FILE, "w", encoding="utf-8") as f:
+      json.dump(data, f, ensure_ascii=False, indent=4)
+  except Exception as e:
+    print(f"Error saving trial history: {e}")
 
 
 def load_groups():
@@ -165,7 +187,24 @@ def save_tracked_deals(data):
 
 
 all_users = load_users()
+trial_history = load_trial_history()
 active_groups = load_groups()
+
+
+def has_used_trial_before(uid_str, user_uname):
+  if uid_str in trial_history:
+    return True
+  norm_uname = (user_uname or "").lstrip("@").strip().lower()
+  if norm_uname:
+    for rec in trial_history.values():
+      rec_uname = (rec.get("username") or "").lstrip("@").strip().lower()
+      if rec_uname and rec_uname == norm_uname:
+        return True
+  if uid_str in all_users:
+    u = all_users[uid_str]
+    if u.get("trial_used") is True or u.get("is_trial") is not None:
+      return True
+  return False
 
 
 def ensure_admin_entry(user):
@@ -498,62 +537,124 @@ def send_welcome(message):
   user_uname = (user.username or "").strip()
 
   if uid_str not in all_users:
-    expiry_date = datetime.now() + timedelta(days=3)
-    all_users[uid_str] = {
-        "name": user_name,
-        "username": user_uname,
-        "expiry": expiry_date.isoformat(),
-        "is_trial": True,
-        "trial_used": True,
-        "invited_by": referrer_id,
-        "referral_count": 0,
-    }
-
-    if referrer_id and referrer_id in all_users and referrer_id != uid_str:
-      all_users[referrer_id]["referral_count"] = (
-          all_users[referrer_id].get("referral_count", 0) + 1
-      )
-      ref_current_exp = datetime.fromisoformat(all_users[referrer_id]["expiry"])
-      ref_new_exp = max(ref_current_exp, datetime.now()) + timedelta(days=2)
-      all_users[referrer_id]["expiry"] = ref_new_exp.isoformat()
+    if has_used_trial_before(uid_str, user_uname):
+      prev_exp_str = trial_history.get(uid_str, {}).get("expiry")
       try:
-        bot.send_message(
-            int(referrer_id),
-            "🎉 انضم مستخدم جديد عبر رابطك! تمت إضافة يومين رصيد لاشتراكك.",
-            parse_mode="Markdown",
+        expiry_date = (
+            datetime.fromisoformat(prev_exp_str)
+            if prev_exp_str
+            else datetime.now()
         )
       except Exception:
-        pass
-    save_users(all_users)
+        expiry_date = datetime.now()
 
-    try:
-      admin_alert_text = (
-          "🚨 **مشترك جديد انضم إلى البوت!**\n\n"
-          f"👤 **الاسم:** {user_name}\n"
-          f"🆔 المعرف (ID): `{user_id}`\n"
-          f"🌐 اليوزر: `@{user_uname}`\n"
-          f"👥 إجمالي المشتركين الآن: `{len(all_users)}`"
+      all_users[uid_str] = {
+          "name": user_name,
+          "username": user_uname,
+          "expiry": expiry_date.isoformat(),
+          "is_trial": False,
+          "trial_used": True,
+          "invited_by": referrer_id,
+          "referral_count": 0,
+      }
+      trial_history[uid_str] = {
+          "username": user_uname,
+          "expiry": expiry_date.isoformat(),
+          "used_at": trial_history.get(uid_str, {}).get(
+              "used_at", datetime.now().isoformat()
+          ),
+      }
+      save_trial_history(trial_history)
+      save_users(all_users)
+
+      welcome_text = (
+          f"أهلاً بك يا **{user_name}**.\n\n"
+          "⚠️ تم استخدام الفترة التجريبية مسبقاً لهذا الحساب ولا يمكن إعادة"
+          " تفعيلها.\n"
+          f"📩 للتواصل والاشتراك: {ADMIN_USERNAME}"
       )
-      bot.send_message(ADMIN_ID, admin_alert_text, parse_mode="Markdown")
-    except Exception:
-      pass
+    else:
+      now_dt = datetime.now()
+      expiry_date = now_dt + timedelta(days=3)
+      all_users[uid_str] = {
+          "name": user_name,
+          "username": user_uname,
+          "expiry": expiry_date.isoformat(),
+          "is_trial": True,
+          "trial_used": True,
+          "invited_by": referrer_id,
+          "referral_count": 0,
+      }
+      trial_history[uid_str] = {
+          "username": user_uname,
+          "expiry": expiry_date.isoformat(),
+          "used_at": now_dt.isoformat(),
+      }
+      save_trial_history(trial_history)
 
-    welcome_text = (
-        "🎉 أهلاً بك في بوت التداول الذكي والشامل! 🤖\n\n"
-        "🎁 تم تفعيل فترة تجريبية مجانية لمدة 3 أيام لحسابك بنجاح.\n"
-        "اختر ما تحتاجه من الأزرار أدناه:"
-    )
+      if referrer_id and referrer_id in all_users and referrer_id != uid_str:
+        all_users[referrer_id]["referral_count"] = (
+            all_users[referrer_id].get("referral_count", 0) + 1
+        )
+        ref_current_exp = datetime.fromisoformat(
+            all_users[referrer_id]["expiry"]
+        )
+        ref_new_exp = max(ref_current_exp, datetime.now()) + timedelta(days=2)
+        all_users[referrer_id]["expiry"] = ref_new_exp.isoformat()
+        try:
+          bot.send_message(
+              int(referrer_id),
+              "🎉 انضم مستخدم جديد عبر رابطك! تمت إضافة يومين رصيد لاشتراكك.",
+              parse_mode="Markdown",
+          )
+        except Exception:
+          pass
+      save_users(all_users)
+
+      try:
+        admin_alert_text = (
+            "🚨 **مشترك جديد انضم إلى البوت!**\n\n"
+            f"👤 **الاسم:** {user_name}\n"
+            f"🆔 المعرف (ID): `{user_id}`\n"
+            f"🌐 اليوزر: `@{user_uname}`\n"
+            f"👥 إجمالي المشتركين الآن: `{len(all_users)}`"
+        )
+        bot.send_message(ADMIN_ID, admin_alert_text, parse_mode="Markdown")
+      except Exception:
+        pass
+
+      welcome_text = (
+          "🎉 أهلاً بك في بوت التداول الذكي والشامل! 🤖\n\n"
+          "🎁 تم تفعيل فترة تجريبية مجانية لمدة 3 أيام لحسابك بنجاح.\n"
+          "اختر ما تحتاجه من الأزرار أدناه:"
+      )
   else:
+    changed_user = False
     if all_users[uid_str].get("username") != user_uname or all_users[
         uid_str
     ].get("name") != user_name:
       all_users[uid_str]["username"] = user_uname
       all_users[uid_str]["name"] = user_name
+      changed_user = True
+    if all_users[uid_str].get("trial_used") is not True:
+      all_users[uid_str]["trial_used"] = True
+      changed_user = True
+    if uid_str not in trial_history:
+      trial_history[uid_str] = {
+          "username": user_uname,
+          "expiry": all_users[uid_str]["expiry"],
+          "used_at": datetime.now().isoformat(),
+      }
+      save_trial_history(trial_history)
+    if changed_user:
       save_users(all_users)
 
     expiry_dt = datetime.fromisoformat(all_users[uid_str]["expiry"])
     remaining = expiry_dt - datetime.now()
     if remaining.total_seconds() > 0:
+      if all_users[uid_str].get("is_trial") is True:
+        all_users[uid_str]["is_trial"] = False
+        save_users(all_users)
       days_left = max(0, remaining.days)
       hours_left = max(0, remaining.seconds // 3600)
       welcome_text = (
@@ -563,6 +664,9 @@ def send_welcome(message):
           "اختر ما تحتاجه من الأزرار أدناه:"
       )
     else:
+      if all_users[uid_str].get("is_trial") is not False:
+        all_users[uid_str]["is_trial"] = False
+        save_users(all_users)
       welcome_text = (
           f"أهلاً بك مجدداً يا **{user_name}**.\n\n"
           "⚠️ انتهت الفترة التجريبية/الاشتراك الخاص بحسابك ولن يتم تجديدها"
