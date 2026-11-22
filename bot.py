@@ -513,17 +513,6 @@ DEAL_STOP_EXPLANATION = (
 )
 
 
-def pin_suggested_deals(user_id_str, category_key, deals_entries):
-  tracked = load_tracked_deals()
-  if user_id_str not in tracked:
-    tracked[user_id_str] = {}
-  tracked[user_id_str][category_key] = {
-      "timestamp": datetime.now().isoformat(),
-      "entries": deals_entries,
-  }
-  save_tracked_deals(tracked)
-
-
 # --- القائمة الرئيسية ---
 def get_main_menu(user_id):
   markup = types.ReplyKeyboardMarkup(
@@ -531,6 +520,9 @@ def get_main_menu(user_id):
   )
   btn_golden = types.KeyboardButton("📊 صفقات القاعدة الذهبية للعملات")
   btn_analytical = types.KeyboardButton("📊 صفقات الرؤية التحليلية للعملات")
+  btn_single_fast = types.KeyboardButton(
+      "⚡ صفقة سريعة (+5% هدف وحيد / -2% وقف)"
+  )
   btn_gold_golden = types.KeyboardButton("🟡 صفقات الذهب (القاعدة الذهبية)")
   btn_gold_analytical = types.KeyboardButton("🟡 صفقات الذهب (الرؤية التحليلية)")
 
@@ -554,6 +546,7 @@ def get_main_menu(user_id):
     markup.add(
         btn_golden,
         btn_analytical,
+        btn_single_fast,
         btn_gold_golden,
         btn_gold_analytical,
         btn_results,
@@ -573,6 +566,7 @@ def get_main_menu(user_id):
     markup.add(
         btn_golden,
         btn_analytical,
+        btn_single_fast,
         btn_gold_golden,
         btn_gold_analytical,
         btn_results,
@@ -878,12 +872,13 @@ def send_golden_rule_deals(message):
     )
     return
 
-  pin_suggested_deals(
-      user_id,
-      "golden_rule",
-      {
+  tracked = load_tracked_deals()
+  if user_id not in tracked:
+    tracked[user_id] = {}
+  tracked[user_id]["golden_rule"] = {
+      "timestamp": datetime.now().isoformat(),
+      "entries": {
           "XRP": {
-              "deal_no": 1,
               "entry": xrp,
               "tp1": xrp * 1.008,
               "tp2": xrp * 1.015,
@@ -892,7 +887,6 @@ def send_golden_rule_deals(message):
               "status": "active",
           },
           "BTC": {
-              "deal_no": 1,
               "entry": btc,
               "tp1": btc * 1.012,
               "tp2": btc * 1.025,
@@ -901,7 +895,6 @@ def send_golden_rule_deals(message):
               "status": "active",
           },
           "ETH": {
-              "deal_no": 1,
               "entry": eth,
               "tp1": eth * 1.03,
               "tp2": eth * 1.06,
@@ -910,7 +903,8 @@ def send_golden_rule_deals(message):
               "status": "active",
           },
       },
-  )
+  }
+  save_tracked_deals(tracked)
 
   xrp_tp1_pct = calculate_profit_percentage(xrp, xrp * 1.008, "BUY")
   xrp_tp2_pct = calculate_profit_percentage(xrp, xrp * 1.015, "BUY")
@@ -927,9 +921,7 @@ def send_golden_rule_deals(message):
       "📊 **صفقات القاعدة الذهبية للعملات (النسب الثابتة وإدارة المخاطر - بالسعر"
       " الحي):**\n\n"
       "📡 *يتم الاعتماد على السعر الحي لحظة إصدار التوصية دون تثبيت أرقام"
-      " ثابتة.*\n"
-      "📌 *تم تثبيت جميع الصفقات المقترحة تلقائياً لمتابعتها وإرسال تقرير"
-      " فور إتمام شروطها.*\n\n"
+      " ثابتة.*\n\n"
       f"{DEAL_STOP_EXPLANATION}\n\n"
       "⚡ **1. صفقات السكالبينج للعملات:**\n"
       f"• **العملة:** XRP/USDT (سعر الدخول الحي: `{xrp:,.4f}`)\n"
@@ -995,12 +987,13 @@ def send_analytical_vision_deals(message):
   eth_price, eth_chg, eth_trend, eth_tp1_p, eth_tp2_p, eth_sl_p = eth_data
   xrp_price, xrp_chg, xrp_trend, xrp_tp1_p, xrp_tp2_p, xrp_sl_p = xrp_data
 
-  pin_suggested_deals(
-      user_id,
-      "analytical",
-      {
+  tracked = load_tracked_deals()
+  if user_id not in tracked:
+    tracked[user_id] = {}
+  tracked[user_id]["analytical"] = {
+      "timestamp": datetime.now().isoformat(),
+      "entries": {
           "BTC": {
-              "deal_no": 1,
               "entry": btc_price,
               "tp1": btc_price * (1 + btc_tp1_p),
               "tp2": btc_price * (1 + btc_tp2_p),
@@ -1009,7 +1002,6 @@ def send_analytical_vision_deals(message):
               "status": "active",
           },
           "ETH": {
-              "deal_no": 1,
               "entry": eth_price,
               "tp1": eth_price * (1 + eth_tp1_p),
               "tp2": eth_price * (1 + eth_tp2_p),
@@ -1018,7 +1010,6 @@ def send_analytical_vision_deals(message):
               "status": "active",
           },
           "XRP": {
-              "deal_no": 1,
               "entry": xrp_price,
               "tp1": xrp_price * (1 + xrp_tp1_p),
               "tp2": xrp_price * (1 + xrp_tp2_p),
@@ -1027,13 +1018,12 @@ def send_analytical_vision_deals(message):
               "status": "active",
           },
       },
-  )
+  }
+  save_tracked_deals(tracked)
 
   deals_text = (
       "📊 **صفقات الرؤية التحليلية وقراءة الزخم الحي للعملات:**\n\n"
-      "📡 *السعر الحي لحظة إصدار التوصية فقط (بدون تثبيت أرقام ثابتة).*\n"
-      "📌 *تم تثبيت جميع الصفقات المقترحة تلقائياً لمتابعتها وإرسال تقرير"
-      " فور إتمام شروطها.*\n\n"
+      "📡 *السعر الحي لحظة إصدار التوصية فقط (بدون تثبيت أرقام ثابتة).*\n\n"
       f"{DEAL_STOP_EXPLANATION}\n\n"
       f"🪙 **1. بيتكوين (BTC/USDT):**\n"
       f"• السعر الحي: `{btc_price:,.2f}$` (التغير 24س: `{btc_chg:+.2f}%`)\n"
@@ -1058,6 +1048,81 @@ def send_analytical_vision_deals(message):
 
 
 @bot.message_handler(
+    func=lambda message: message.text
+    == "⚡ صفقة سريعة (+5% هدف وحيد / -2% وقف)"
+)
+def send_single_target_fast_deals(message):
+  if not can_use_bot(message):
+    return
+  user_id = str(message.from_user.id)
+  btc, eth, xrp = get_crypto_prices()
+
+  if btc is None or eth is None or xrp is None:
+    send_with_menu(
+        message,
+        "⚠️ تعذّر جلب الأسعار الحية للعملات حالياً (احتمال توقف السعر"
+        " اللحظي أو توقف/تأخر الشموع وبيانات السوق)، يرجى المحاولة بعد قليل.",
+    )
+    return
+
+  tracked = load_tracked_deals()
+  if user_id not in tracked:
+    tracked[user_id] = {}
+  tracked[user_id]["single_fast_5_2"] = {
+      "timestamp": datetime.now().isoformat(),
+      "entries": {
+          "XRP": {
+              "entry": xrp,
+              "tp1": xrp * 1.05,
+              "tp2": 0,
+              "sl": xrp * (1 - 0.02),
+              "stage": "single_tp",
+              "status": "active",
+          },
+          "BTC": {
+              "entry": btc,
+              "tp1": btc * 1.05,
+              "tp2": 0,
+              "sl": btc * (1 - 0.02),
+              "stage": "single_tp",
+              "status": "active",
+          },
+          "ETH": {
+              "entry": eth,
+              "tp1": eth * 1.05,
+              "tp2": 0,
+              "sl": eth * (1 - 0.02),
+              "stage": "single_tp",
+              "status": "active",
+          },
+      },
+  }
+  save_tracked_deals(tracked)
+
+  xrp_tp = xrp * 1.05
+  xrp_sl = xrp * (1 - 0.02)
+  btc_tp = btc * 1.05
+  btc_sl = btc * (1 - 0.02)
+  eth_tp = eth * 1.05
+  eth_sl = eth * (1 - 0.02)
+
+  deals_text = (
+      "⚡ **صفقات سريعة بهدف ربح وحيد (+5% / -2% وقف خسارة):**\n\n"
+      "📡 *السعر الحي لحظة إصدار التوصية (هدف وحيد دون هدف ثانٍ).* \n"
+      "📌 *تم تثبيت جميع الصفقات المقترحة تلقائياً لمتابعتها وإرسال تقرير"
+      " فور إتمام شروطها.*\n\n"
+      f"{DEAL_STOP_EXPLANATION}\n\n"
+      f"• **XRP/USDT:** دخول `{xrp:,.4f}` | 🎯 هدف وحيد: `{xrp_tp:,.4f}`"
+      f" (+5.0%) | 🛑 وقف: `{xrp_sl:,.4f}` (-2.0%)\n"
+      f"• **BTC/USDT:** دخول `{btc:,.2f}` | 🎯 هدف وحيد: `{btc_tp:,.2f}`"
+      f" (+5.0%) | 🛑 وقف: `{btc_sl:,.2f}` (-2.0%)\n"
+      f"• **ETH/USDT:** دخول `{eth:,.2f}` | 🎯 هدف وحيد: `{eth_tp:,.2f}`"
+      f" (+5.0%) | 🛑 وقف: `{eth_sl:,.2f}` (-2.0%)"
+  )
+  send_with_menu(message, deals_text)
+
+
+@bot.message_handler(
     func=lambda message: message.text == "🟡 صفقات الذهب (القاعدة الذهبية)"
 )
 def send_gold_golden_rule(message):
@@ -1074,12 +1139,13 @@ def send_gold_golden_rule(message):
     )
     return
 
-  pin_suggested_deals(
-      user_id,
-      "gold_golden",
-      {
+  tracked = load_tracked_deals()
+  if user_id not in tracked:
+    tracked[user_id] = {}
+  tracked[user_id]["gold_golden"] = {
+      "timestamp": datetime.now().isoformat(),
+      "entries": {
           "GOLD": {
-              "deal_no": 1,
               "entry": current_gold,
               "tp1": current_gold * (1 + 0.007),
               "tp2": current_gold * (1 + 0.014),
@@ -1088,7 +1154,8 @@ def send_gold_golden_rule(message):
               "status": "active",
           }
       },
-  )
+  }
+  save_tracked_deals(tracked)
 
   tp1_price = current_gold * (1 + 0.007)
   tp2_price = current_gold * (1 + 0.014)
@@ -1096,9 +1163,7 @@ def send_gold_golden_rule(message):
 
   gold_text = (
       "🟡 **توصيات صفقات الذهب (القاعدة الذهبية):**\n\n"
-      "📡 *السعر الحي لحظة إصدار التوصية فقط (بدون تثبيت أرقام ثابتة).*\n"
-      "📌 *تم تثبيت الصفقة المقترحة تلقائياً لمتابعتها وإرسال تقرير فور"
-      " إتمام شروطها.*\n\n"
+      "📡 *السعر الحي لحظة إصدار التوصية فقط (بدون تثبيت أرقام ثابتة).*\n\n"
       f"{DEAL_STOP_EXPLANATION}\n\n"
       f"📍 **سعر الدخول الحي (Entry):** `{current_gold:,.2f}` $\n"
       f"🛑 **وقف الخسارة المقترح (SL):** `{sl_price:,.2f}` $ (-1.0%)\n\n"
@@ -1125,12 +1190,13 @@ def send_gold_analytical_vision(message):
     )
     return
 
-  pin_suggested_deals(
-      user_id,
-      "gold_analytical",
-      {
+  tracked = load_tracked_deals()
+  if user_id not in tracked:
+    tracked[user_id] = {}
+  tracked[user_id]["gold_analytical"] = {
+      "timestamp": datetime.now().isoformat(),
+      "entries": {
           "GOLD": {
-              "deal_no": 1,
               "entry": current_gold,
               "tp1": current_gold * (1 + 0.01),
               "tp2": current_gold * (1 + 0.02),
@@ -1139,7 +1205,8 @@ def send_gold_analytical_vision(message):
               "status": "active",
           }
       },
-  )
+  }
+  save_tracked_deals(tracked)
 
   tp1_price = current_gold * (1 + 0.01)
   tp2_price = current_gold * (1 + 0.02)
@@ -1147,9 +1214,7 @@ def send_gold_analytical_vision(message):
 
   gold_text = (
       "🟡 **توصيات صفقات الذهب (الرؤية التحليلية والزخم الحي):**\n\n"
-      "📡 *السعر الحي لحظة إصدار التوصية فقط (بدون تثبيت أرقام ثابتة).*\n"
-      "📌 *تم تثبيت الصفقة المقترحة تلقائياً لمتابعتها وإرسال تقرير فور"
-      " إتمام شروطها.*\n\n"
+      "📡 *السعر الحي لحظة إصدار التوصية فقط (بدون تثبيت أرقام ثابتة).*\n\n"
       f"{DEAL_STOP_EXPLANATION}\n\n"
       f"📍 **سعر الدخول الحي (Entry):** `{current_gold:,.2f}` $\n"
       f"🛑 **وقف الخسارة (SL):** `{sl_price:,.2f}` $ (-1.2%)\n\n"
@@ -1345,7 +1410,7 @@ def background_price_monitor():
           else:
             del custom_alerts[user_id]
 
-      # فحص جميع الصفقات المثبتة بالتوازي (متابعة TP1 ثم تحويله تلقائياً لصفقة ثانية نحو TP2 مع تعديل الخسارة)
+      # فحص جميع الصفقات المثبتة بالتوازي (متابعة TP1 ثم تحويله تلقائياً لصفقة ثانية نحو TP2 مع تعديل الخسارة، أو هدف وحيد single_tp)
       tracked_deals = load_tracked_deals()
       if tracked_deals:
         updated = False
@@ -1362,7 +1427,65 @@ def background_price_monitor():
                   tp2 = data.get("tp2", 0)
                   sl = data.get("sl", 0)
 
-                  if stage == "tp1":
+                  if stage == "single_tp":
+                    if tp1 > 0 and current_val >= tp1:
+                      data["status"] = "tp_hit"
+                      updated = True
+
+                      try:
+                        bot.send_message(
+                            int(user_id),
+                            "🎯 **تم تحقيق الهدف الوحيد (+5%) للصفقة"
+                            " السريعة!**\n\n"
+                            f"🪙 الأصل/العملة: `{symbol}`\n"
+                            f"📈 السعر الحي: `{current_val:,.4f}`\n"
+                            "✅ **تم إغلاق الصفقة بنجاح على الهدف"
+                            " الوحيد.**",
+                            parse_mode="Markdown",
+                        )
+                      except Exception:
+                        pass
+
+                      try:
+                        r_db = load_results()
+                        res_msg = (
+                            f"✅ صفقة {symbol} تحقيق الهدف الوحيد (+5%) عند"
+                            f" السعر الحي {current_val:,.4f}"
+                        )
+                        r_db["daily"].append(res_msg)
+                        save_results(r_db)
+                      except Exception:
+                        pass
+
+                    elif sl > 0 and current_val <= sl:
+                      data["status"] = "sl_hit"
+                      updated = True
+
+                      try:
+                        bot.send_message(
+                            int(user_id),
+                            "🛑 **تحديث نتيجة صفقة سريعة (إغلاق"
+                            " وقائي)!**\n\n"
+                            f"🪙 الأصل/العملة: `{symbol}`\n"
+                            f"📉 السعر الحي: `{current_val:,.4f}`\n"
+                            "❌ **تم ضرب مستوى وقف الخسارة (-2%).**",
+                            parse_mode="Markdown",
+                        )
+                      except Exception:
+                        pass
+
+                      try:
+                        r_db = load_results()
+                        res_msg = (
+                            f"❌ صفقة {symbol} ضرب وقف الخسارة (-2%) عند"
+                            f" السعر الحي {current_val:,.4f}"
+                        )
+                        r_db["daily"].append(res_msg)
+                        save_results(r_db)
+                      except Exception:
+                        pass
+
+                  elif stage == "tp1":
                     if tp1 > 0 and current_val >= tp1:
                       updated = True
 
@@ -1379,25 +1502,20 @@ def background_price_monitor():
 
                       if tp2 > 0:
                         new_sl = entry_price
-                        data["deal_no"] = 2
                         data["sl"] = new_sl
                         data["stage"] = "tp2"
                         data["status"] = "active"
                         try:
                           bot.send_message(
                               int(user_id),
-                              "📋 **تقرير إتمام الصفقة الأولى وتحقيق الهدف"
-                              " الأول (TP1)!**\n\n"
+                              "🎯 **تم تحقيق الهدف الأول (TP1) وإغلاق الصفقة"
+                              " الأولى!**\n\n"
                               f"🪙 الأصل/العملة: `{symbol}`\n"
-                              f"📈 السعر الحي عند الإنجاز: `{current_val:,.4f}`\n"
-                              "✅ **تم إغلاق الصفقة الأولى بنجاح عند"
-                              f" `TP1` (`{tp1:,.4f}`).**\n"
-                              "🆕 **تم فتح صفقة ثانية جديدة تلقائياً نحو الهدف"
-                              f" الثاني (`TP2`): `{tp2:,.4f}`**\n"
-                              "🛡️ **تم ضبط وقف الخسارة (`SL`) للصفقة الثانية"
-                              f" عند نقطة الدخول: `{new_sl:,.4f}`**\n"
-                              "📡 *جاري متابعة الصفقة الثانية لإبلاغك بتقريرها"
-                              " فور إتمام شروطها.*",
+                              f"📈 السعر الحي: `{current_val:,.4f}`\n"
+                              "🔄 **تم تلقائياً تفعيل صفقة ثانية نحو الهدف"
+                              f" الثاني (TP2): `{tp2:,.4f}`**\n"
+                              "🛑 **تم تحديث وقف الخسارة (SL) الجديد إلى نقطة"
+                              f" الدخول: `{new_sl:,.4f}`**",
                               parse_mode="Markdown",
                           )
                         except Exception:
@@ -1407,11 +1525,12 @@ def background_price_monitor():
                         try:
                           bot.send_message(
                               int(user_id),
-                              "📋 **تقرير إتمام الصفقة وتحقيق الهدف الأول"
-                              " (TP1)!**\n\n"
+                              "🎯 **تحديث نتيجة صفقة مثبتة (إنجاز"
+                              " تلقائي)!**\n\n"
                               f"🪙 الأصل/العملة: `{symbol}`\n"
-                              f"📈 السعر الحي عند الإنجاز: `{current_val:,.4f}`\n"
-                              "✅ **تم تحقيق الهدف الأول (TP1) بنجاح.**",
+                              f"📈 السعر الحي: `{current_val:,.4f}`\n"
+                              "✅ **مبروك! تم تحقيق الهدف الأول (TP1)"
+                              " بنجاح.**",
                               parse_mode="Markdown",
                           )
                         except Exception:
@@ -1424,12 +1543,10 @@ def background_price_monitor():
                       try:
                         bot.send_message(
                             int(user_id),
-                            "📋 **تقرير إغلاق الصفقة الأولى على وقف الخسارة"
-                            " (SL)!**\n\n"
+                            "🛑 **تحديث نتيجة صفقة مثبتة (إغلاق وقائي)!**\n\n"
                             f"🪙 الأصل/العملة: `{symbol}`\n"
-                            f"📉 السعر الحي عند الإغلاق: `{current_val:,.4f}`\n"
-                            "❌ **تم ضرب مستوى وقف الخسارة (`SL`:"
-                            f" `{sl:,.4f}`).**",
+                            f"📉 السعر الحي: `{current_val:,.4f}`\n"
+                            "❌ **تم ضرب مستوى وقف الخسارة (SL).**",
                             parse_mode="Markdown",
                         )
                       except Exception:
@@ -1454,12 +1571,12 @@ def background_price_monitor():
                       try:
                         bot.send_message(
                             int(user_id),
-                            "📋 **تقرير إتمام الصفقة الثانية وتحقيق الهدف"
-                            " الثاني (TP2)!**\n\n"
+                            "🚀 **تم تحقيق الهدف الثاني (TP2) للصفقة"
+                            " الثانية!**\n\n"
                             f"🪙 الأصل/العملة: `{symbol}`\n"
-                            f"📈 السعر الحي عند الإنجاز: `{current_val:,.4f}`\n"
-                            "🚀 **تم إغلاق الصفقة الثانية بنجاح عند الهدف"
-                            f" الثاني (`TP2`: `{tp2:,.4f}`).**",
+                            f"📈 السعر الحي: `{current_val:,.4f}`\n"
+                            "✅ **مبروك! تم إغلاق الصفقة الثانية بنجاح عند"
+                            " TP2.**",
                             parse_mode="Markdown",
                         )
                       except Exception:
@@ -1483,12 +1600,12 @@ def background_price_monitor():
                       try:
                         bot.send_message(
                             int(user_id),
-                            "📋 **تقرير إغلاق الصفقة الثانية على وقف الخسارة"
-                            " المعدّل (SL)!**\n\n"
+                            "🛡️ **إغلاق الصفقة الثانية على وقف الخسارة المعدّل"
+                            " (SL)!**\n\n"
                             f"🪙 الأصل/العملة: `{symbol}`\n"
-                            f"📉 السعر الحي عند الإغلاق: `{current_val:,.4f}`\n"
-                            "🛡️ **تم إغلاق الصفقة الثانية عند مستوى وقف"
-                            f" الخسارة المؤمَّن (`{sl:,.4f}`).**",
+                            f"📉 السعر الحي: `{current_val:,.4f}`\n"
+                            "⚠️ **تم إغلاق الصفقة الثانية عند مستوى وقف"
+                            f" الخسارة الجديد (`{sl:,.4f}`).**",
                             parse_mode="Markdown",
                         )
                       except Exception:
