@@ -166,7 +166,7 @@ def save_results(data):
 
 # دوال إدارة وتثبيت الصفقات النشطة للمستخدمين
 def load_tracked_deals():
-  if os.path.exists(ACTIVE_DEALS_FILE):
+a  if os.path.exists(ACTIVE_DEALS_FILE):
     try:
       with open(ACTIVE_DEALS_FILE, "r", encoding="utf-8") as f:
         content = f.read()
